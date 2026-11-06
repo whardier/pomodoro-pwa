@@ -249,10 +249,13 @@ button:active { background: var(--btn-press); transform: scale(.97); }
 button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
 /* Target end time */
+/* Clock block: current time over the end time, both in one digits column so the colons line up. */
 .eta {
-  display: flex;
+  display: grid;
+  grid-template-columns: max-content max-content max-content;
+  column-gap: 10px;
+  row-gap: 2px;
   align-items: baseline;
-  gap: 8px;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -272,6 +275,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   color: var(--accent);
   transition: color .3s;
 }
+.eta-time.now { color: var(--fg); }
 .eta-day { font-size: 15px; font-weight: 600; color: var(--muted); }
 
 /* Timer tabs */
@@ -462,6 +466,9 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
   <section class="controls" aria-label="Timer controls">
     <div class="eta" id="eta" aria-live="off">
+      <span class="eta-label">Now</span>
+      <span class="eta-time now" id="nowTime">--:--:--</span>
+      <span class="eta-day"></span>
       <span class="eta-label" id="etaLabel">Ends at</span>
       <span class="eta-time" id="etaTime">--:--</span>
       <span class="eta-day" id="etaDay"></span>
@@ -707,6 +714,12 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     if (d.toDateString() === tmr.toDateString()) return "tomorrow";
     return dayFmt ? dayFmt.format(d) : "";
   }
+  var nowTime = $("nowTime"), nowSec = -1;
+  function renderNow() {
+    var ms = Date.now(), sec = Math.floor(ms / 1000);
+    if (sec === nowSec) return;
+    nowSec = sec; nowTime.textContent = clock(ms);
+  }
   var etaSec = -1, etaLbl = "";
   function renderEta(t, r, paused) {
     var label, at;
@@ -822,6 +835,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   }
 
   setInterval(function () {
+    renderNow();
     for (var i = 0; i < G.timers.length; i++) {
       var t = G.timers[i];
       if (t.running && rem(t) <= 0) finish(t);
@@ -1003,7 +1017,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
       if (t.running && t.endAt <= Date.now()) { t.endedAt = t.endAt; t.running = false; t.remaining = 0; t.done = true; }
     });
     if (anyRunning()) wake();
-    buildStars(); renderSound(); render(); save(); fitDial();
+    buildStars(); renderSound(); renderNow(); render(); save(); fitDial();
   }
   if (window.claude && window.claude.hot && window.claude.hot.snapshot) {
     window.claude.hot.snapshot(function () { return { G: G }; });
