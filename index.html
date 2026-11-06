@@ -29,6 +29,7 @@ body { margin: 0; font-size: 14px; }
   --btn-press: #3d302b;
   --line: #4a3a33;
   --fg: #f5ebe4;
+  --fg-dim: #7b7672;   /* --fg at half brightness, for the seconds */
   --muted: #a8968b;
   --ink: #1b0f0b;
   /* timer colors, always assigned in this order: 1 red, 2 orange, 3 yellow, 4 green, 5 blue */
@@ -192,6 +193,9 @@ body {
   transition: color .3s;
 }
 .time {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
   font-family: var(--font-digits);
   font-weight: 700;
   font-size: calc(var(--dial) * 0.2);
@@ -199,6 +203,16 @@ body {
   font-variant-numeric: tabular-nums;
   letter-spacing: -.02em;
 }
+/* Seconds sit back: half-bright, half-transparent, on their own compositing layer. */
+.ss {
+  color: var(--fg-dim);
+  opacity: .5;
+  will-change: opacity;
+  transform: translateZ(0);
+}
+/* Past 99 minutes the minutes keep full size; colon and seconds shrink to make room. */
+.time.wide .colon, .time.wide .ss { font-size: .5em; }
+.time.wide .colon { margin: 0 .05em; }
 .status {
   font-size: calc(var(--dial) * 0.052);
   font-weight: 500;
@@ -207,6 +221,7 @@ body {
 }
 .dial.paused .time { animation: blink 1.4s steps(2, jump-none) infinite; }
 .dial.done .time { color: var(--accent); }
+.dial.done .ss { color: var(--accent); }
 @keyframes blink { 50% { opacity: .45; } }
 
 /* ---------- Controls ---------- */
@@ -430,7 +445,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     </svg>
     <div class="readout">
       <div class="mode-label" id="modeLabel">Focus</div>
-      <div class="time" id="time">25:00</div>
+      <div class="time" id="time"><span class="mm" id="mm">25</span><span class="colon">:</span><span class="ss" id="ss">00</span></div>
       <div class="status" id="status">Ready</div>
     </div>
   </div>
@@ -478,7 +493,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 <script>
 (function () {
   "use strict";
-  var MAX = 99 * 60 + 59;
+  var MAX = 999 * 60 + 59;    // display tops out at 999:59
   var SEC_PER_TURN = 300;      // one full turn of the dial = 5 minutes
   var STEP = 5;                // dial moves in 5-second detents
   var MAX_TIMERS = 5;
@@ -711,9 +726,17 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     var v = (CIRC * (1 - frac)).toFixed(2);
     if (v !== lastDash) { arc.setAttribute("stroke-dashoffset", v); lastDash = v; }
   }
-  var lastShown = "";
-  function setDigits(txt) {
-    if (txt !== lastShown) { timeEl.textContent = txt; lastShown = txt; dial.setAttribute("aria-valuetext", txt + " remaining"); }
+  var mmEl = $("mm"), ssEl = $("ss"), lastMM = "", lastSS = "", lastWide = null, lastShown = "";
+  function setDigits(sec) {
+    var m = Math.floor(sec / 60), x = sec % 60;
+    var ms = (m < 10 ? "0" : "") + m, xs = (x < 10 ? "0" : "") + x;
+    if (ms !== lastMM) { mmEl.textContent = ms; lastMM = ms; }
+    if (xs !== lastSS) { ssEl.textContent = xs; lastSS = xs; }
+    var wide = m >= 100;
+    if (wide !== lastWide) { timeEl.classList.toggle("wide", wide); lastWide = wide; }
+    var txt = ms + ":" + xs;
+    if (txt !== lastShown) { lastShown = txt; dial.setAttribute("aria-valuetext", txt + " remaining"); }
+    return txt;
   }
   // Outer ring: accent on for the last quarter of the preset, breathing for the last minute.
   var lastWarn = null, lastFinal = null;
@@ -734,7 +757,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   function renderLight(t) {
     var r = rem(t);
     setDone(t);
-    setDigits(fmt(shown(t)));
+    setDigits(shown(t));
     setArc(t, r);
     setRingState(t, r);
     renderEta(t, r, !t.running && !t.done && r < t.total);
@@ -742,8 +765,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
   var lastColor = "", lastTitle = "", lastMode = "", lastStatus = "", lastGo = "", lastPaused = null;
   function render() {
-    var t = cur(), r = rem(t), txt = fmt(shown(t));
-    setDigits(txt);
+    var t = cur(), r = rem(t), txt = setDigits(shown(t));
     var title = anyRunning() ? txt + " · Pomodoro Dial" : "Pomodoro Dial";
     if (title !== lastTitle) { document.title = title; lastTitle = title; }
 
