@@ -129,6 +129,23 @@ body {
   backface-visibility: hidden;
 }
 .face-svg { pointer-events: none; }
+/* Accent copy of the ring: hidden until the last quarter of the preset, breathing in the last minute.
+   Opacity on its own composited layer, so neither state repaints the SVG. */
+.ring-accent {
+  will-change: transform, opacity;
+  opacity: 0;
+  transition: opacity .6s ease;
+}
+.ring-accent .bezel { fill: none; }
+.ring-accent .bezel-edge { stroke: var(--accent); stroke-width: 2.5; }
+.ring-accent .tick { stroke: var(--accent); opacity: .85; }
+.ring-accent .tick.major { stroke: var(--accent); opacity: 1; }
+.dial.warn .ring-accent { opacity: 1; }
+.dial.final .ring-accent { animation: breathe 3.2s ease-in-out infinite; }
+@keyframes breathe {
+  0%, 100% { opacity: .12; }
+  50%      { opacity: 1; }
+}
 .bezel { fill: var(--surface); }
 .bezel-edge { fill: none; stroke: var(--line); stroke-width: 1; }
 .tick { stroke: var(--muted); stroke-width: 1.2; stroke-linecap: round; opacity: .55; }
@@ -368,6 +385,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
   .layer { animation: none; }
+  .dial.final .ring-accent { animation: none; opacity: 1; }
   .arc { transition: none; }
   .dial.paused .time, .tab.done { animation: none; }
   button:active { transform: none; }
@@ -388,6 +406,10 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
       <circle class="bezel" cx="100" cy="100" r="99"></circle>
       <circle class="bezel-edge" cx="100" cy="100" r="98.5"></circle>
       <g id="jog"></g>
+    </svg>
+    <svg class="ring ring-accent" viewBox="0 0 200 200" id="ringAccent" aria-hidden="true">
+      <circle class="bezel-edge" cx="100" cy="100" r="98.5"></circle>
+      <g id="jogAccent"></g>
     </svg>
     <svg class="face-svg" viewBox="0 0 200 200" aria-hidden="true">
       <circle class="face" cx="100" cy="100" r="82"></circle>
@@ -453,7 +475,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
   var $ = function (id) { return document.getElementById(id); };
   var root = document.documentElement;
-  var dial = $("dial"), ring = $("ring"), jog = $("jog"), arc = $("arc");
+  var dial = $("dial"), ring = $("ring"), ringAccent = $("ringAccent"), jog = $("jog"), arc = $("arc");
   var timeEl = $("time"), statusEl = $("status"), modeLabel = $("modeLabel");
   var goBtn = $("goBtn"), tabsEl = $("tabs"), addBtn = $("addBtn");
   var presetEls = document.querySelectorAll(".preset");
@@ -482,6 +504,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
         '" y1="' + (100 - r1 * Math.cos(a)).toFixed(2) + '" x2="' + (100 + r2 * Math.sin(a)).toFixed(2) +
         '" y2="' + (100 - r2 * Math.cos(a)).toFixed(2) + '"></line>';
     }
+    $("jogAccent").innerHTML = html;
     html += '<circle class="grip" cx="100" cy="9.5" r="4.2"></circle>';
     jog.innerHTML = html;
     arc.setAttribute("stroke-dasharray", CIRC.toFixed(2));
@@ -665,7 +688,10 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   var lastRot = null;
   function setRot() {
     var v = G.rot.toFixed(1);
-    if (v !== lastRot) { ring.style.transform = "rotate(" + v + "deg)"; lastRot = v; }
+    if (v !== lastRot) {
+      var tr = "rotate(" + v + "deg)";
+      ring.style.transform = tr; ringAccent.style.transform = tr; lastRot = v;
+    }
   }
   var lastDash = "";
   function setArc(t, r) {
@@ -677,11 +703,20 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   function setDigits(txt) {
     if (txt !== lastShown) { timeEl.textContent = txt; lastShown = txt; dial.setAttribute("aria-valuetext", txt + " remaining"); }
   }
+  // Outer ring: accent on for the last quarter of the preset, breathing for the last minute.
+  var lastWarn = null, lastFinal = null;
+  function setRingState(t, r) {
+    var warn = r <= t.presetMin * 60 * 0.25;
+    var fin = warn && r <= 60 && !t.done;
+    if (warn !== lastWarn) { dial.classList.toggle("warn", warn); lastWarn = warn; }
+    if (fin !== lastFinal) { dial.classList.toggle("final", fin); lastFinal = fin; }
+  }
   // Only what moves while the finger is on the dial.
   function renderLight(t) {
     var r = rem(t);
     setDigits(fmt(shown(t)));
     setArc(t, r);
+    setRingState(t, r);
     renderEta(t, r, !t.running && !t.done && r < t.total);
   }
 
@@ -696,6 +731,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     var onBreak = t.mode === "break" && !t.done;
     if (onBreak !== lastBreak) { starsEl.classList.toggle("on", onBreak); lastBreak = onBreak; }
     setArc(t, r);
+    setRingState(t, r);
     setRot();
     var ml = labelFor(t);
     if (ml !== lastMode) { modeLabel.textContent = ml; lastMode = ml; }
