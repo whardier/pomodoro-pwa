@@ -31,12 +31,13 @@ body { margin: 0; font-size: 14px; }
   --fg: #f5ebe4;
   --muted: #a8968b;
   --ink: #1b0f0b;
-  --tomato: #ff5b3d;
-  --leaf: #72c46f;
-  --sky: #4fb3ff;
-  --amber: #ffb83d;
-  --orchid: #d27bff;
-  --accent: var(--tomato);
+  /* timer colors, always assigned in this order: 1 red, 2 orange, 3 yellow, 4 green, 5 blue */
+  --red: #ff4b4b;
+  --orange: #ff8c32;
+  --yellow: #ffd23f;
+  --green: #5ccf6a;
+  --blue: #4aa6ff;
+  --accent: var(--red);
   --font-digits: "Azeret Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   --font-ui: "Barlow Semi Condensed", "Roboto Condensed", "Arial Narrow", system-ui, sans-serif;
   --gap: clamp(6px, 1.6vh, 12px);
@@ -203,7 +204,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 }
 .tabs::-webkit-scrollbar { display: none; }
 .tab {
-  --c: var(--tomato);
+  --c: var(--red);
   flex: 0 0 auto;
   min-height: 46px;
   padding: 0 10px 0 8px;
@@ -393,7 +394,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   var SEC_PER_TURN = 300;      // one full turn of the dial = 5 minutes
   var STEP = 5;                // dial moves in 5-second detents
   var MAX_TIMERS = 5;
-  var COLORS = ["tomato", "sky", "leaf", "amber", "orchid"];
+  var COLORS = ["red", "orange", "yellow", "green", "blue"];
   var R = 74, CIRC = 2 * Math.PI * R;
 
   var $ = function (id) { return document.getElementById(id); };
@@ -413,14 +414,8 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
              remaining: (min || 25) * 60, running: false, endAt: 0, done: false };
   }
   function cur() { return G.timers[G.sel]; }
-  function freeColor() {
-    for (var i = 0; i < COLORS.length; i++) {
-      var used = false;
-      for (var j = 0; j < G.timers.length; j++) if (G.timers[j].color === COLORS[i]) used = true;
-      if (!used) return COLORS[i];
-    }
-    return COLORS[0];
-  }
+  // Colors follow slot order, so timer 1 is always red, timer 2 orange, and so on.
+  function recolor() { G.timers.forEach(function (t, i) { t.color = COLORS[i % COLORS.length]; }); }
 
   /* ---------- Build jog ticks ---------- */
   (function buildTicks() {
@@ -455,7 +450,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   }
   function click() { if (G.sound) tone(1800, 0, 0.03, 0.06, "square"); }
   // Each color gets its own chime pitch so you can tell timers apart by ear.
-  var CHIME_BASE = { tomato: 659, sky: 784, leaf: 587, amber: 880, orchid: 523 };
+  var CHIME_BASE = { red: 523, orange: 587, yellow: 659, green: 784, blue: 880 };  // rising with timer number
   function chime(color) {
     if (!G.sound) return;
     var b = CHIME_BASE[color] || 659, notes = [b, b * 1.189, b * 1.498];
@@ -727,6 +722,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     if (x) {
       var k = +x.dataset.x;
       G.timers.splice(k, 1);
+      recolor();
       if (G.sel >= G.timers.length) G.sel = G.timers.length - 1;
       render(); save(); return;
     }
@@ -739,7 +735,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   });
   $("addBtn").addEventListener("click", function () {
     if (G.timers.length >= MAX_TIMERS) return;
-    G.timers.push(newTimer(freeColor(), 25, "focus"));
+    G.timers.push(newTimer(COLORS[G.timers.length], 25, "focus"));
     G.sel = G.timers.length - 1;
     render(); save();
   });
@@ -771,9 +767,10 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
       G.focusDone = st.focusDone || 0;
       if (typeof st.rot === "number") G.rot = st.rot;
     } else {
-      G.timers = [newTimer("tomato", 25, "focus")];
+      G.timers = [newTimer("red", 25, "focus")];
       G.sel = 0;
     }
+    recolor();
     // Timers that ran out while the page was closed finish quietly.
     G.timers.forEach(function (t) {
       if (t.running && t.endAt <= Date.now()) { t.endedAt = t.endAt; t.running = false; t.remaining = 0; t.done = true; }

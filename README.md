@@ -9,7 +9,7 @@ A touch Pomodoro timer built for small landscape screens like the Echo Show 5 (9
 - Jog dial: touch to pause, turn clockwise to add time, counter-clockwise to remove it (5-second detents, 5 minutes per turn)
 - Quick nudges: ±1, ±3, ±5 minutes, running or paused
 - Local end time for the selected timer; while paused it keeps sliding later
-- Up to 5 timers at once, each with its own color and chime pitch; tap a tab to put it on the dial
+- Up to 5 timers at once, colored in a fixed order (red, orange, yellow, green, blue) with rising chime pitches; tap a tab to put it on the dial
 - Long break suggested after every 4th focus session
 - End chime and dial clicks (toggleable), screen wake lock, full-screen button
 - Timers keep counting across reloads
