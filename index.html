@@ -158,6 +158,32 @@ button {
 button:active { background: var(--btn-press); transform: scale(.97); }
 button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
+/* Target end time */
+.eta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.eta-label {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.eta-time {
+  font-family: var(--font-digits);
+  font-weight: 700;
+  font-size: clamp(18px, 5vh, 24px);
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  transition: color .3s;
+}
+.eta-day { font-size: 15px; font-weight: 600; color: var(--muted); }
+
 /* Timer tabs */
 .top {
   display: flex;
@@ -321,6 +347,11 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   </div>
 
   <section class="controls" aria-label="Timer controls">
+    <div class="eta" id="eta" aria-live="off">
+      <span class="eta-label" id="etaLabel">Ends at</span>
+      <span class="eta-time" id="etaTime">--:--</span>
+      <span class="eta-day" id="etaDay"></span>
+    </div>
     <div class="top">
       <div class="tabs" id="tabs" role="tablist" aria-label="Timers"></div>
       <button class="icon-btn add-btn" id="addBtn" aria-label="Add timer">+</button>
@@ -470,6 +501,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     t.running = false; render(); save();
   }
   function finish(t) {
+    t.endedAt = t.running ? Math.min(t.endAt, Date.now()) : Date.now();
     t.running = false; t.remaining = 0; t.done = true;
     if (t.mode === "focus") G.focusDone++;
     chime(t.color);
@@ -525,6 +557,31 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     $("addBtn").hidden = G.timers.length >= MAX_TIMERS;
   }
 
+  // Local wall-clock time the selected timer will hit 00:00. While paused or not yet
+  // started it is "now + time left", so it keeps sliding later every second.
+  var etaLabel = $("etaLabel"), etaTime = $("etaTime"), etaDay = $("etaDay");
+  function clock(ms) {
+    try { return new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" }); }
+    catch (e) { var d = new Date(ms); return d.getHours() + ":" + ("0" + d.getMinutes()).slice(-2) + ":" + ("0" + d.getSeconds()).slice(-2); }
+  }
+  function dayTag(ms) {
+    var d = new Date(ms), now = new Date();
+    if (d.toDateString() === now.toDateString()) return "";
+    var tmr = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    if (d.toDateString() === tmr.toDateString()) return "tomorrow";
+    try { return d.toLocaleDateString([], { weekday: "short" }); } catch (e) { return ""; }
+  }
+  function renderEta(t, r, paused) {
+    var label, at;
+    if (t.done) { label = "Ended at"; at = t.endedAt || Date.now(); }
+    else if (t.running) { label = "Ends at"; at = t.endAt; }
+    else { label = paused ? "Resume now, ends" : "Start now, ends"; at = Date.now() + Math.round(r) * 1000; }
+    var txt = clock(at), day = dayTag(at);
+    if (etaLabel.textContent !== label) etaLabel.textContent = label;
+    if (etaTime.textContent !== txt) etaTime.textContent = txt;
+    if (etaDay.textContent !== day) etaDay.textContent = day;
+  }
+
   var lastShown = "", lastColor = "";
   function render() {
     var t = cur(), r = rem(t), txt = fmt(shown(t));
@@ -561,6 +618,8 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
       goBtn.textContent = "Start";
     }
 
+    renderEta(t, r, paused);
+
     var btns = document.querySelectorAll(".preset");
     for (var i = 0; i < btns.length; i++) {
       var b = btns[i];
@@ -574,12 +633,11 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   }
 
   setInterval(function () {
-    var changed = false;
     for (var i = 0; i < G.timers.length; i++) {
       var t = G.timers[i];
-      if (t.running) { changed = true; if (rem(t) <= 0) finish(t); }
+      if (t.running && rem(t) <= 0) finish(t);
     }
-    if (changed) render();
+    render();   // always: a paused timer's end time keeps moving out
   }, 250);
 
   /* ---------- Dial gesture ---------- */
@@ -718,7 +776,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     }
     // Timers that ran out while the page was closed finish quietly.
     G.timers.forEach(function (t) {
-      if (t.running && t.endAt <= Date.now()) { t.running = false; t.remaining = 0; t.done = true; }
+      if (t.running && t.endAt <= Date.now()) { t.endedAt = t.endAt; t.running = false; t.remaining = 0; t.done = true; }
     });
     if (anyRunning()) wake();
     render(); save();
