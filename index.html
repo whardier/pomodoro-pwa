@@ -279,7 +279,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 <body>
 <main class="app">
   <div class="dial" id="dial">
-    <svg viewBox="0 0 200 200" id="dialSvg" role="slider" aria-label="Jog dial: turn clockwise to fast-forward, counter-clockwise to rewind" tabindex="0">
+    <svg viewBox="0 0 200 200" id="dialSvg" role="slider" aria-label="Jog dial: turn clockwise to add time, counter-clockwise to remove time" tabindex="0">
       <circle class="bezel" cx="100" cy="100" r="99"></circle>
       <circle class="bezel-edge" cx="100" cy="100" r="98.5"></circle>
       <g id="jog"></g>
@@ -292,7 +292,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
       <div class="time" id="time">25:00</div>
       <div class="status" id="status">Ready</div>
     </div>
-    <div class="jog-hint" aria-hidden="true"><span>↺ Rewind</span><span>Forward ↻</span></div>
+    <div class="jog-hint" aria-hidden="true"><span>↺ Less time</span><span>More time ↻</span></div>
   </div>
 
   <section class="controls" aria-label="Timer controls">
@@ -528,9 +528,9 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     var a = angleOf(e), d = a - drag.last;
     if (d > 180) d -= 360; else if (d < -180) d += 360;
     drag.last = a;
-    // clockwise (d > 0) = fast-forward = less time left; counter-clockwise = rewind
+    // clockwise (d > 0) adds time; counter-clockwise removes time
     var before = S.remaining;
-    drag.acc -= d * SEC_PER_TURN / 360;
+    drag.acc += d * SEC_PER_TURN / 360;
     var steps = drag.acc > 0 ? Math.floor(drag.acc / STEP) : Math.ceil(drag.acc / STEP);
     if (steps !== 0) {
       drag.acc -= steps * STEP;
@@ -551,13 +551,13 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     e.preventDefault();
     if (S.running) pause();
     var dir = e.deltaY > 0 ? -1 : 1;
-    S.rot -= dir * 6;
+    S.rot += dir * 6;
     var before = S.remaining;
     if (setRemaining(Math.round(before) + dir * STEP) !== before) click();
   }, { passive: false });
   svg.addEventListener("keydown", function (e) {
-    if (e.key === "ArrowLeft" || e.key === "ArrowDown") { e.preventDefault(); if (S.running) pause(); S.rot -= 6; setRemaining(Math.round(S.remaining) + STEP); click(); }
-    if (e.key === "ArrowRight" || e.key === "ArrowUp") { e.preventDefault(); if (S.running) pause(); S.rot += 6; setRemaining(Math.round(S.remaining) - STEP); click(); }
+    if (e.key === "ArrowLeft" || e.key === "ArrowDown") { e.preventDefault(); if (S.running) pause(); S.rot -= 6; setRemaining(Math.round(S.remaining) - STEP); click(); }
+    if (e.key === "ArrowRight" || e.key === "ArrowUp") { e.preventDefault(); if (S.running) pause(); S.rot += 6; setRemaining(Math.round(S.remaining) + STEP); click(); }
   });
 
   /* ---------- Buttons ---------- */
