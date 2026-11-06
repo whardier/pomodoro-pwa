@@ -68,21 +68,31 @@ body {
   padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
 
-/* ---------- Dial ---------- */
+/* ---------- Dial ----------
+   Two stacked SVGs: the tick ring rotates as one GPU-composited layer (CSS transform),
+   the face/arc above it only repaints when the remaining time changes. */
 .dial {
   position: relative;
   width: var(--dial);
   height: var(--dial);
   max-width: 100%;
-}
-.dial svg {
-  width: 100%;
-  height: 100%;
-  display: block;
   touch-action: none;
   cursor: grab;
 }
-.dial.scrubbing svg { cursor: grabbing; }
+.dial.scrubbing { cursor: grabbing; }
+.dial svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.ring {
+  will-change: transform;
+  transform: rotate(0deg);
+  backface-visibility: hidden;
+}
+.face-svg { pointer-events: none; }
 .bezel { fill: var(--surface); }
 .bezel-edge { fill: none; stroke: var(--line); stroke-width: 1; }
 .tick { stroke: var(--muted); stroke-width: 1.2; stroke-linecap: round; opacity: .55; }
@@ -94,9 +104,8 @@ body {
   stroke: var(--accent);
   stroke-width: 7;
   stroke-linecap: round;
-  transition: stroke-dashoffset .25s linear, stroke .3s;
+  transition: stroke .3s;
 }
-.dial.scrubbing .arc, .dial.switching .arc { transition: stroke .3s; }
 .face { fill: var(--bg); }
 
 .readout {
@@ -331,11 +340,13 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 </head>
 <body>
 <main class="app">
-  <div class="dial" id="dial">
-    <svg viewBox="0 0 200 200" id="dialSvg" role="slider" aria-label="Jog dial: turn clockwise to add time, counter-clockwise to remove time" tabindex="0">
+  <div class="dial" id="dial" role="slider" aria-label="Jog dial: turn clockwise to add time, counter-clockwise to remove time" tabindex="0">
+    <svg class="ring" viewBox="0 0 200 200" id="ring" aria-hidden="true">
       <circle class="bezel" cx="100" cy="100" r="99"></circle>
       <circle class="bezel-edge" cx="100" cy="100" r="98.5"></circle>
       <g id="jog"></g>
+    </svg>
+    <svg class="face-svg" viewBox="0 0 200 200" aria-hidden="true">
       <circle class="face" cx="100" cy="100" r="82"></circle>
       <circle class="track" cx="100" cy="100" r="74"></circle>
       <circle class="arc" id="arc" cx="100" cy="100" r="74" transform="rotate(-90 100 100)"></circle>
@@ -399,9 +410,10 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
   var $ = function (id) { return document.getElementById(id); };
   var root = document.documentElement;
-  var dial = $("dial"), svg = $("dialSvg"), jog = $("jog"), arc = $("arc");
+  var dial = $("dial"), ring = $("ring"), jog = $("jog"), arc = $("arc");
   var timeEl = $("time"), statusEl = $("status"), modeLabel = $("modeLabel");
-  var goBtn = $("goBtn"), tabsEl = $("tabs");
+  var goBtn = $("goBtn"), tabsEl = $("tabs"), addBtn = $("addBtn");
+  var presetEls = document.querySelectorAll(".preset");
 
   var G = { timers: [], sel: 0, sound: true, rot: 0, focusDone: 0 };
 
@@ -448,7 +460,22 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + dur + 0.02);
   }
-  function click() { if (G.sound) tone(1800, 0, 0.03, 0.06, "square"); }
+  var clickBuf = null;
+  function click() {
+    if (!G.sound) return;
+    var c = audio(); if (!c) return;
+    if (!clickBuf) {
+      var n = Math.floor(c.sampleRate * 0.03);
+      clickBuf = c.createBuffer(1, n, c.sampleRate);
+      var d = clickBuf.getChannelData(0);
+      for (var i = 0; i < n; i++) {
+        var env = 1 - i / n;
+        d[i] = (Math.sin(2 * Math.PI * 1800 * i / c.sampleRate) > 0 ? 1 : -1) * 0.06 * env * env;
+      }
+    }
+    var src = c.createBufferSource();
+    src.buffer = clickBuf; src.connect(c.destination); src.start();
+  }
   // Each color gets its own chime pitch so you can tell timers apart by ear.
   var CHIME_BASE = { red: 523, orange: 587, yellow: 659, green: 784, blue: 880 };  // rising with timer number
   function chime(color) {
@@ -474,13 +501,13 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   /* ---------- Timer core ---------- */
   function rem(t) { return t.running ? Math.max(0, (t.endAt - Date.now()) / 1000) : t.remaining; }
 
-  function setRemaining(t, r) {
+  function setRemaining(t, r, light) {
     r = Math.max(0, Math.min(MAX, r));
     if (t.running) t.endAt = Date.now() + r * 1000; else t.remaining = r;
     if (r > t.total) t.total = r;
     if (r > 0) t.done = false;
     if (r === 0 && t.running) finish(t);
-    render(); save();
+    if (light) renderLight(t); else { render(); save(); }
     return r;
   }
   function start(t) {
@@ -524,7 +551,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     return t.mode === "focus" ? (t.presetMin >= 50 ? "Deep focus" : "Focus") : (t.presetMin >= 15 ? "Long break" : "Break");
   }
 
-  var tabSig = "";
+  var tabSig = "", tabEls = [];
   function renderTabs() {
     var sig = G.timers.map(function (t) { return t.color; }).join() + "|" + G.sel;
     if (sig !== tabSig) {
@@ -537,94 +564,119 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
           html += '<button class="tab-x" data-x="' + i + '" aria-label="Remove ' + t.color + ' timer">×</button>';
       });
       tabsEl.innerHTML = html;
-      var selTab = tabsEl.querySelector('[data-i="' + G.sel + '"]');
+      tabEls = [];
+      var found = tabsEl.querySelectorAll(".tab");
+      for (var k = 0; k < found.length; k++) tabEls.push({ el: found[k], sp: found[k].lastChild, txt: "", sel: null, run: null, done: null });
+      var selTab = tabEls[G.sel] && tabEls[G.sel].el;
       if (selTab && selTab.scrollIntoView) selTab.scrollIntoView({ block: "nearest", inline: "nearest" });
+      addBtn.hidden = G.timers.length >= MAX_TIMERS;
     }
-    var tabs = tabsEl.querySelectorAll(".tab");
-    for (var i = 0; i < tabs.length; i++) {
-      var t = G.timers[i], txt = fmt(shown(t));
-      var sp = tabs[i].lastChild;
-      if (sp.textContent !== txt) sp.textContent = txt;
-      tabs[i].setAttribute("aria-selected", i === G.sel ? "true" : "false");
-      tabs[i].classList.toggle("running", t.running);
-      tabs[i].classList.toggle("done", t.done && i !== G.sel);
+    for (var i = 0; i < tabEls.length; i++) {
+      var t = G.timers[i], c = tabEls[i], txt = fmt(shown(t));
+      var sel = i === G.sel, done = t.done && !sel;
+      if (c.txt !== txt) { c.sp.textContent = txt; c.txt = txt; }
+      if (c.sel !== sel) { c.el.setAttribute("aria-selected", sel ? "true" : "false"); c.sel = sel; }
+      if (c.run !== t.running) { c.el.classList.toggle("running", t.running); c.run = t.running; }
+      if (c.done !== done) { c.el.classList.toggle("done", done); c.done = done; }
     }
-    $("addBtn").hidden = G.timers.length >= MAX_TIMERS;
   }
 
   // Local wall-clock time the selected timer will hit 00:00. While paused or not yet
   // started it is "now + time left", so it keeps sliding later every second.
   var etaLabel = $("etaLabel"), etaTime = $("etaTime"), etaDay = $("etaDay");
+  // Building an Intl formatter is the slow part on low-end devices, so build each once.
+  var timeFmt = null, dayFmt = null;
+  try { timeFmt = new Intl.DateTimeFormat([], { hour: "numeric", minute: "2-digit", second: "2-digit" }); } catch (e) {}
+  try { dayFmt = new Intl.DateTimeFormat([], { weekday: "short" }); } catch (e) {}
   function clock(ms) {
-    try { return new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" }); }
-    catch (e) { var d = new Date(ms); return d.getHours() + ":" + ("0" + d.getMinutes()).slice(-2) + ":" + ("0" + d.getSeconds()).slice(-2); }
+    if (timeFmt) return timeFmt.format(ms);
+    var d = new Date(ms);
+    return d.getHours() + ":" + ("0" + d.getMinutes()).slice(-2) + ":" + ("0" + d.getSeconds()).slice(-2);
   }
   function dayTag(ms) {
     var d = new Date(ms), now = new Date();
     if (d.toDateString() === now.toDateString()) return "";
     var tmr = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     if (d.toDateString() === tmr.toDateString()) return "tomorrow";
-    try { return d.toLocaleDateString([], { weekday: "short" }); } catch (e) { return ""; }
+    return dayFmt ? dayFmt.format(d) : "";
   }
+  var etaSec = -1, etaLbl = "";
   function renderEta(t, r, paused) {
     var label, at;
     if (t.done) { label = "Ended at"; at = t.endedAt || Date.now(); }
     else if (t.running) { label = "Ends at"; at = t.endAt; }
     else { label = paused ? "Resume now, ends" : "Start now, ends"; at = Date.now() + Math.round(r) * 1000; }
+    var sec = Math.floor(at / 1000);
+    if (sec === etaSec && label === etaLbl) return;   // nothing visible changed
+    etaSec = sec; etaLbl = label;
     var txt = clock(at), day = dayTag(at);
     if (etaLabel.textContent !== label) etaLabel.textContent = label;
     if (etaTime.textContent !== txt) etaTime.textContent = txt;
     if (etaDay.textContent !== day) etaDay.textContent = day;
   }
 
-  var lastShown = "", lastColor = "";
+  var lastRot = null;
+  function setRot() {
+    var v = G.rot.toFixed(1);
+    if (v !== lastRot) { ring.style.transform = "rotate(" + v + "deg)"; lastRot = v; }
+  }
+  var lastDash = "";
+  function setArc(t, r) {
+    var frac = t.total > 0 ? Math.min(1, r / t.total) : 0;
+    var v = (CIRC * (1 - frac)).toFixed(2);
+    if (v !== lastDash) { arc.setAttribute("stroke-dashoffset", v); lastDash = v; }
+  }
+  var lastShown = "";
+  function setDigits(txt) {
+    if (txt !== lastShown) { timeEl.textContent = txt; lastShown = txt; dial.setAttribute("aria-valuetext", txt + " remaining"); }
+  }
+  // Only what moves while the finger is on the dial.
+  function renderLight(t) {
+    var r = rem(t);
+    setDigits(fmt(shown(t)));
+    setArc(t, r);
+  }
+
+  var lastColor = "", lastTitle = "", lastMode = "", lastStatus = "", lastGo = "", lastPaused = null, lastDone = null;
   function render() {
     var t = cur(), r = rem(t), txt = fmt(shown(t));
-    if (txt !== lastShown) { timeEl.textContent = txt; lastShown = txt; }
-    document.title = anyRunning() ? txt + " · Pomodoro Dial" : "Pomodoro Dial";
+    setDigits(txt);
+    var title = anyRunning() ? txt + " · Pomodoro Dial" : "Pomodoro Dial";
+    if (title !== lastTitle) { document.title = title; lastTitle = title; }
 
-    if (t.color !== lastColor) {
-      dial.classList.add("switching");
-      root.style.setProperty("--accent", "var(--" + t.color + ")");
-      lastColor = t.color;
-      setTimeout(function () { dial.classList.remove("switching"); }, 50);
-    }
-    var frac = t.total > 0 ? Math.min(1, r / t.total) : 0;
-    arc.setAttribute("stroke-dashoffset", (CIRC * (1 - frac)).toFixed(2));
-    jog.setAttribute("transform", "rotate(" + G.rot.toFixed(1) + " 100 100)");
-    modeLabel.textContent = labelFor(t);
+    if (t.color !== lastColor) { root.style.setProperty("--accent", "var(--" + t.color + ")"); lastColor = t.color; }
+    setArc(t, r);
+    setRot();
+    var ml = labelFor(t);
+    if (ml !== lastMode) { modeLabel.textContent = ml; lastMode = ml; }
 
     var paused = !t.running && !t.done && r < t.total;
-    dial.classList.toggle("paused", paused);
-    dial.classList.toggle("done", t.done);
+    if (paused !== lastPaused) { dial.classList.toggle("paused", paused); lastPaused = paused; }
+    if (t.done !== lastDone) { dial.classList.toggle("done", t.done); lastDone = t.done; }
 
+    var st, go;
     if (t.done) {
-      statusEl.textContent = "Time’s up";
+      st = "Time’s up";
       var n = nextUp(t);
-      goBtn.textContent = n.mode === "break" ? "Start " + n.min + "-min break" : "Start focus";
-    } else if (t.running) {
-      statusEl.textContent = t.mode === "focus" ? "Focusing" : "On break";
-      goBtn.textContent = "Pause";
-    } else if (paused) {
-      statusEl.textContent = "Paused · turn dial to adjust";
-      goBtn.textContent = "Resume";
-    } else {
-      statusEl.textContent = "Ready";
-      goBtn.textContent = "Start";
-    }
+      go = n.mode === "break" ? "Start " + n.min + "-min break" : "Start focus";
+    } else if (t.running) { st = t.mode === "focus" ? "Focusing" : "On break"; go = "Pause"; }
+    else if (paused) { st = "Paused · turn dial to adjust"; go = "Resume"; }
+    else { st = "Ready"; go = "Start"; }
+    if (st !== lastStatus) { statusEl.textContent = st; lastStatus = st; }
+    if (go !== lastGo) { goBtn.textContent = go; lastGo = go; }
 
     renderEta(t, r, paused);
 
-    var btns = document.querySelectorAll(".preset");
-    for (var i = 0; i < btns.length; i++) {
-      var b = btns[i];
-      b.setAttribute("aria-pressed", (+b.dataset.min === t.presetMin && b.dataset.mode === t.mode) ? "true" : "false");
+    for (var i = 0; i < presetEls.length; i++) {
+      var b = presetEls[i];
+      var on = (+b.dataset.min === t.presetMin && b.dataset.mode === t.mode) ? "true" : "false";
+      if (b.getAttribute("aria-pressed") !== on) b.setAttribute("aria-pressed", on);
     }
     renderTabs();
-
+  }
+  function renderSound() {
     $("soundBtn").setAttribute("aria-pressed", G.sound ? "true" : "false");
     $("waves").style.opacity = G.sound ? 1 : 0;
-    svg.setAttribute("aria-valuetext", txt + " remaining");
   }
 
   setInterval(function () {
@@ -632,52 +684,54 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
       var t = G.timers[i];
       if (t.running && rem(t) <= 0) finish(t);
     }
-    render();   // always: a paused timer's end time keeps moving out
+    if (drag) return;   // the gesture handler is already painting the dial
+    render();           // a paused timer's end time keeps moving out
   }, 250);
 
   /* ---------- Dial gesture ---------- */
   var drag = null;
-  function angleOf(e) {
-    var b = svg.getBoundingClientRect();
-    return Math.atan2(e.clientY - (b.top + b.height / 2), e.clientX - (b.left + b.width / 2)) * 180 / Math.PI;
-  }
-  svg.addEventListener("pointerdown", function (e) {
+  // The dial centre is measured once per gesture, so a move never forces layout.
+  function angleAt(e, c) { return Math.atan2(e.clientY - c.y, e.clientX - c.x) * 180 / Math.PI; }
+  dial.addEventListener("pointerdown", function (e) {
     audio();
     var t = cur();
     if (t.running) pause(t);
     if (t.done) t.done = false;
     t.remaining = Math.round(t.remaining);
-    drag = { id: e.pointerId, last: angleOf(e), acc: 0 };
-    try { svg.setPointerCapture(e.pointerId); } catch (x) {}
+    var b = dial.getBoundingClientRect();
+    var c = { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+    drag = { id: e.pointerId, c: c, last: angleAt(e, c), acc: 0 };
+    try { dial.setPointerCapture(e.pointerId); } catch (x) {}
     dial.classList.add("scrubbing");
     e.preventDefault();
   });
-  svg.addEventListener("pointermove", function (e) {
+  dial.addEventListener("pointermove", function (e) {
     if (!drag || e.pointerId !== drag.id) return;
     var t = cur();
-    var a = angleOf(e), d = a - drag.last;
+    var a = angleAt(e, drag.c), d = a - drag.last;
     if (d > 180) d -= 360; else if (d < -180) d += 360;
     drag.last = a;
     // clockwise (d > 0) adds time; counter-clockwise removes time
     var before = t.remaining;
     drag.acc += d * SEC_PER_TURN / 360;
-    var steps = drag.acc > 0 ? Math.floor(drag.acc / STEP) : Math.ceil(drag.acc / STEP);
+    var steps = drag.acc > 0 ? Math.floor(drag.acc / STEP + 1e-9) : Math.ceil(drag.acc / STEP - 1e-9);
     if (steps !== 0) {
       drag.acc -= steps * STEP;
-      var after = setRemaining(t, before + steps * STEP);
+      var after = setRemaining(t, before + steps * STEP, true);
       if (after !== before) click();
       else drag.acc = 0;             // hit 00:00 or max: stop winding
     }
     if (t.remaining !== before || steps === 0) G.rot += d;
-    jog.setAttribute("transform", "rotate(" + G.rot.toFixed(1) + " 100 100)");
+    setRot();
   });
   function endDrag(e) {
     if (!drag || e.pointerId !== drag.id) return;
-    drag = null; dial.classList.remove("scrubbing"); render();
+    drag = null; dial.classList.remove("scrubbing");
+    render(); save();   // one full refresh and one disk write per gesture
   }
-  svg.addEventListener("pointerup", endDrag);
-  svg.addEventListener("pointercancel", endDrag);
-  svg.addEventListener("wheel", function (e) {
+  dial.addEventListener("pointerup", endDrag);
+  dial.addEventListener("pointercancel", endDrag);
+  dial.addEventListener("wheel", function (e) {
     e.preventDefault();
     var t = cur();
     if (t.running) pause(t);
@@ -686,7 +740,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     var before = t.remaining;
     if (setRemaining(t, Math.round(before) + dir * STEP) !== before) click();
   }, { passive: false });
-  svg.addEventListener("keydown", function (e) {
+  dial.addEventListener("keydown", function (e) {
     var t = cur(), dir = 0;
     if (e.key === "ArrowLeft" || e.key === "ArrowDown") dir = -1;
     if (e.key === "ArrowRight" || e.key === "ArrowUp") dir = 1;
@@ -742,7 +796,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   $("soundBtn").addEventListener("click", function () {
     G.sound = !G.sound; store("sound", G.sound);
     if (G.sound) click();
-    render();
+    renderSound();
   });
   var fsBtn = $("fsBtn");
   if (document.fullscreenEnabled) {
@@ -753,7 +807,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     });
   }
   document.addEventListener("keydown", function (e) {
-    if (e.target === svg) return;
+    if (e.target === dial) return;
     if (e.key === " " && e.target.tagName !== "BUTTON") { e.preventDefault(); goBtn.click(); }
   });
 
@@ -776,7 +830,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
       if (t.running && t.endAt <= Date.now()) { t.endedAt = t.endAt; t.running = false; t.remaining = 0; t.done = true; }
     });
     if (anyRunning()) wake();
-    render(); save();
+    renderSound(); render(); save();
   }
   if (window.claude && window.claude.hot && window.claude.hot.snapshot) {
     window.claude.hot.snapshot(function () { return { G: G }; });
