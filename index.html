@@ -21,18 +21,21 @@ body { margin: 0; font-size: 14px; }
 [hidden] { display: none !important; }
 </style>
 <style>
-/* Layout: one-screen kiosk for a 960×480 landscape panel — jog dial on the left, chunky controls on the right; stacks in portrait. */
+/* Layout: one-screen kiosk for a 960×480 landscape panel — jog dial on the left, timer tabs + chunky controls on the right; stacks in portrait. */
 :root {
   --bg: #16110f;
   --surface: #241c19;
-  --raised: #33282400;
   --btn: #2e2420;
   --btn-press: #3d302b;
   --line: #4a3a33;
   --fg: #f5ebe4;
   --muted: #a8968b;
+  --ink: #1b0f0b;
   --tomato: #ff5b3d;
   --leaf: #72c46f;
+  --sky: #4fb3ff;
+  --amber: #ffb83d;
+  --orchid: #d27bff;
   --accent: var(--tomato);
   --font-digits: "Azeret Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   --font-ui: "Barlow Semi Condensed", "Roboto Condensed", "Arial Narrow", system-ui, sans-serif;
@@ -40,7 +43,6 @@ body { margin: 0; font-size: 14px; }
   --dial: min(calc(100vh - 28px), 47vw);
   color-scheme: dark;
 }
-:root[data-mode="break"] { --accent: var(--leaf); }
 
 html, body { height: 100%; }
 body {
@@ -84,7 +86,7 @@ body {
 .bezel-edge { fill: none; stroke: var(--line); stroke-width: 1; }
 .tick { stroke: var(--muted); stroke-width: 1.2; stroke-linecap: round; opacity: .55; }
 .tick.major { stroke: var(--fg); stroke-width: 2; opacity: .8; }
-.grip { fill: var(--accent); }
+.grip { fill: var(--accent); transition: fill .3s; }
 .track { fill: none; stroke: var(--btn); stroke-width: 7; }
 .arc {
   fill: none;
@@ -93,7 +95,7 @@ body {
   stroke-linecap: round;
   transition: stroke-dashoffset .25s linear, stroke .3s;
 }
-.dial.scrubbing .arc { transition: none; }
+.dial.scrubbing .arc, .dial.switching .arc { transition: stroke .3s; }
 .face { fill: var(--bg); }
 
 .readout {
@@ -112,6 +114,7 @@ body {
   letter-spacing: .14em;
   text-transform: uppercase;
   color: var(--accent);
+  transition: color .3s;
 }
 .time {
   font-family: var(--font-digits);
@@ -131,20 +134,6 @@ body {
 .dial.done .time { color: var(--accent); }
 @keyframes blink { 50% { opacity: .45; } }
 
-.jog-hint {
-  position: absolute;
-  left: 0; right: 0;
-  bottom: calc(var(--dial) * -0.005);
-  display: flex;
-  justify-content: space-between;
-  font-size: calc(var(--dial) * 0.042);
-  font-weight: 600;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  color: var(--muted);
-  pointer-events: none;
-}
-
 /* ---------- Controls ---------- */
 .controls {
   min-width: 0;
@@ -154,27 +143,6 @@ body {
   height: 100%;
   justify-content: center;
 }
-.top {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 40px;
-}
-.pips { display: flex; gap: 6px; align-items: center; }
-.pip {
-  width: 12px; height: 12px;
-  border-radius: 50%;
-  border: 2px solid var(--line);
-  box-sizing: border-box;
-}
-.pip.on { background: var(--tomato); border-color: var(--tomato); }
-.pip-label {
-  font-size: 15px;
-  color: var(--muted);
-  font-weight: 500;
-  white-space: nowrap;
-}
-.spacer { flex: 1; }
 
 button {
   font: inherit;
@@ -185,24 +153,81 @@ button {
   min-height: 48px;
   cursor: pointer;
   touch-action: manipulation;
-  transition: background .12s, transform .08s;
+  transition: background .12s, transform .08s, border-color .2s;
 }
 button:active { background: var(--btn-press); transform: scale(.97); }
 button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
+/* Timer tabs */
+.top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.tabs {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 3px;
+  margin: -3px;
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  --c: var(--tomato);
+  flex: 0 0 auto;
+  min-height: 46px;
+  padding: 0 10px 0 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-digits);
+  font-weight: 700;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  background: var(--surface);
+}
+.tab .dot {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--c);
+  box-sizing: border-box;
+}
+.tab.running .dot { background: var(--c); }
+.tab.done { color: var(--c); animation: blink 1s steps(2, jump-none) infinite; }
+.tab[aria-selected="true"] {
+  color: var(--fg);
+  background: var(--btn-press);
+  border-color: var(--c);
+  box-shadow: inset 0 0 0 1px var(--c);
+}
+.tab-x {
+  flex: 0 0 auto;
+  min-height: 46px;
+  min-width: 40px;
+  padding: 0;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--muted);
+  background: transparent;
+  border-color: transparent;
+}
 .icon-btn {
-  min-height: 40px;
-  min-width: 44px;
-  padding: 0 10px;
-  font-size: 15px;
-  font-weight: 600;
+  flex: 0 0 auto;
+  min-height: 46px;
+  min-width: 46px;
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
 }
-.icon-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.icon-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .icon-btn[aria-pressed="false"] { color: var(--muted); }
+.add-btn { font-size: 26px; font-weight: 500; line-height: 1; }
 
 .presets {
   display: grid;
@@ -246,11 +271,12 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .go {
   background: var(--accent);
   border-color: var(--accent);
-  color: #1b0f0b;
+  color: var(--ink);
   font-size: clamp(20px, 5.6vh, 28px);
   font-weight: 700;
   letter-spacing: .04em;
   min-height: clamp(54px, 15vh, 72px);
+  transition: background .3s, border-color .3s, transform .08s;
 }
 .go:active { background: var(--accent); filter: brightness(.88); }
 
@@ -270,7 +296,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
   .arc { transition: none; }
-  .dial.paused .time { animation: none; }
+  .dial.paused .time, .tab.done { animation: none; }
   button:active { transform: none; }
 }
 </style>
@@ -292,19 +318,14 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
       <div class="time" id="time">25:00</div>
       <div class="status" id="status">Ready</div>
     </div>
-    <div class="jog-hint" aria-hidden="true"><span>↺ Less time</span><span>More time ↻</span></div>
   </div>
 
   <section class="controls" aria-label="Timer controls">
     <div class="top">
-      <div class="pips" id="pips" aria-hidden="true">
-        <i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i>
-      </div>
-      <span class="pip-label" id="pipLabel">0 done · long break after 4</span>
-      <span class="spacer"></span>
+      <div class="tabs" id="tabs" role="tablist" aria-label="Timers"></div>
+      <button class="icon-btn add-btn" id="addBtn" aria-label="Add timer">+</button>
       <button class="icon-btn" id="soundBtn" aria-pressed="true" aria-label="Sound">
         <svg viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4V5z"></path><path id="waves" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"></path></svg>
-        <span id="soundTxt">On</span>
       </button>
       <button class="icon-btn" id="fsBtn" aria-label="Full screen" hidden>
         <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"></path></svg>
@@ -340,25 +361,39 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   var MAX = 99 * 60 + 59;
   var SEC_PER_TURN = 300;      // one full turn of the dial = 5 minutes
   var STEP = 5;                // dial moves in 5-second detents
+  var MAX_TIMERS = 5;
+  var COLORS = ["tomato", "sky", "leaf", "amber", "orchid"];
   var R = 74, CIRC = 2 * Math.PI * R;
 
   var $ = function (id) { return document.getElementById(id); };
   var root = document.documentElement;
   var dial = $("dial"), svg = $("dialSvg"), jog = $("jog"), arc = $("arc");
   var timeEl = $("time"), statusEl = $("status"), modeLabel = $("modeLabel");
-  var goBtn = $("goBtn");
+  var goBtn = $("goBtn"), tabsEl = $("tabs");
 
-  var S = {
-    mode: "focus", presetMin: 25, total: 1500, remaining: 1500,
-    running: false, endAt: 0, done: false, sessions: 0, sound: true, rot: 0
-  };
+  var G = { timers: [], sel: 0, sound: true, rot: 0, focusDone: 0 };
 
   function store(k, v) { try { localStorage.setItem("pd_" + k, JSON.stringify(v)); } catch (e) {} }
   function load(k, d) { try { var v = localStorage.getItem("pd_" + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }
+  function save() { store("timers", { timers: G.timers, sel: G.sel, focusDone: G.focusDone }); }
+
+  function newTimer(color, min, mode) {
+    return { color: color, mode: mode || "focus", presetMin: min || 25, total: (min || 25) * 60,
+             remaining: (min || 25) * 60, running: false, endAt: 0, done: false };
+  }
+  function cur() { return G.timers[G.sel]; }
+  function freeColor() {
+    for (var i = 0; i < COLORS.length; i++) {
+      var used = false;
+      for (var j = 0; j < G.timers.length; j++) if (G.timers[j].color === COLORS[i]) used = true;
+      if (!used) return COLORS[i];
+    }
+    return COLORS[0];
+  }
 
   /* ---------- Build jog ticks ---------- */
   (function buildTicks() {
-    var ns = "http://www.w3.org/2000/svg", html = "";
+    var html = "";
     for (var i = 0; i < 60; i++) {
       var a = i * 6 * Math.PI / 180, major = i % 5 === 0;
       var r1 = major ? 85 : 87.5, r2 = 95;
@@ -387,16 +422,19 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + dur + 0.02);
   }
-  function click() { if (S.sound) tone(1800, 0, 0.03, 0.06, "square"); }
-  function chime() {
-    if (!S.sound) return;
-    var notes = [659, 784, 988];
+  function click() { if (G.sound) tone(1800, 0, 0.03, 0.06, "square"); }
+  // Each color gets its own chime pitch so you can tell timers apart by ear.
+  var CHIME_BASE = { tomato: 659, sky: 784, leaf: 587, amber: 880, orchid: 523 };
+  function chime(color) {
+    if (!G.sound) return;
+    var b = CHIME_BASE[color] || 659, notes = [b, b * 1.189, b * 1.498];
     for (var rep = 0; rep < 3; rep++)
       for (var i = 0; i < 3; i++) tone(notes[i], rep * 1.1 + i * 0.18, 0.9, 0.25);
   }
 
   /* ---------- Wake lock ---------- */
   var lock = null;
+  function anyRunning() { for (var i = 0; i < G.timers.length; i++) if (G.timers[i].running) return true; return false; }
   function wake() {
     if (!("wakeLock" in navigator) || lock) return;
     navigator.wakeLock.request("screen").then(function (l) {
@@ -404,83 +442,119 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     }).catch(function () {});
   }
   document.addEventListener("visibilitychange", function () {
-    if (document.visibilityState === "visible" && S.running) wake();
+    if (document.visibilityState === "visible" && anyRunning()) wake();
   });
 
   /* ---------- Timer core ---------- */
-  function rem() { return S.running ? Math.max(0, (S.endAt - Date.now()) / 1000) : S.remaining; }
+  function rem(t) { return t.running ? Math.max(0, (t.endAt - Date.now()) / 1000) : t.remaining; }
 
-  function setRemaining(r) {
+  function setRemaining(t, r) {
     r = Math.max(0, Math.min(MAX, r));
-    if (S.running) S.endAt = Date.now() + r * 1000; else S.remaining = r;
-    if (r > S.total) S.total = r;
-    if (r > 0) S.done = false;
-    if (r === 0 && S.running) finish();
-    render();
+    if (t.running) t.endAt = Date.now() + r * 1000; else t.remaining = r;
+    if (r > t.total) t.total = r;
+    if (r > 0) t.done = false;
+    if (r === 0 && t.running) finish(t);
+    render(); save();
     return r;
   }
-
-  function start() {
+  function start(t) {
     audio();
-    if (rem() <= 0) return;
-    S.endAt = Date.now() + S.remaining * 1000;
-    S.running = true; S.done = false;
-    wake(); render();
+    if (rem(t) <= 0) return;
+    t.endAt = Date.now() + t.remaining * 1000;
+    t.running = true; t.done = false;
+    wake(); render(); save();
   }
-  function pause() {
-    if (!S.running) return;
-    S.remaining = Math.ceil(rem());
-    S.running = false; render();
+  function pause(t) {
+    if (!t.running) return;
+    t.remaining = Math.ceil(rem(t));
+    t.running = false; render(); save();
   }
-  function finish() {
-    S.running = false; S.remaining = 0; S.done = true;
-    if (S.mode === "focus") { S.sessions++; store("sessions", S.sessions); }
-    chime(); render();
+  function finish(t) {
+    t.running = false; t.remaining = 0; t.done = true;
+    if (t.mode === "focus") G.focusDone++;
+    chime(t.color);
+    if (!drag) G.sel = G.timers.indexOf(t);   // bring the finished timer to the dial
+    render(); save();
   }
-  function loadPreset(min, mode) {
-    S.running = false; S.done = false;
-    S.presetMin = min; S.mode = mode;
-    S.total = S.remaining = min * 60;
-    store("preset", { min: min, mode: mode });
-    render();
+  function loadPreset(t, min, mode) {
+    t.running = false; t.done = false;
+    t.presetMin = min; t.mode = mode;
+    t.total = t.remaining = min * 60;
+    render(); save();
   }
-  function nextUp() {
-    if (S.mode === "focus") return S.sessions % 4 === 0 ? { min: 15, mode: "break" } : { min: 5, mode: "break" };
+  function nextUp(t) {
+    if (t.mode === "focus") return G.focusDone > 0 && G.focusDone % 4 === 0 ? { min: 15, mode: "break" } : { min: 5, mode: "break" };
     return { min: 25, mode: "focus" };
   }
 
   /* ---------- Render ---------- */
-  var lastShown = "";
   function fmt(s) {
     var m = Math.floor(s / 60), x = s % 60;
     return (m < 10 ? "0" : "") + m + ":" + (x < 10 ? "0" : "") + x;
   }
+  function shown(t) { var r = rem(t); return t.running ? Math.ceil(r - 1e-6) : Math.round(r); }
+  function labelFor(t) {
+    return t.mode === "focus" ? (t.presetMin >= 50 ? "Deep focus" : "Focus") : (t.presetMin >= 15 ? "Long break" : "Break");
+  }
+
+  var tabSig = "";
+  function renderTabs() {
+    var sig = G.timers.map(function (t) { return t.color; }).join() + "|" + G.sel;
+    if (sig !== tabSig) {
+      tabSig = sig;
+      var html = "";
+      G.timers.forEach(function (t, i) {
+        html += '<button class="tab" role="tab" data-i="' + i + '" style="--c: var(--' + t.color + ')" aria-label="' +
+          t.color + ' timer"><i class="dot"></i><span></span></button>';
+        if (i === G.sel && G.timers.length > 1)
+          html += '<button class="tab-x" data-x="' + i + '" aria-label="Remove ' + t.color + ' timer">×</button>';
+      });
+      tabsEl.innerHTML = html;
+      var selTab = tabsEl.querySelector('[data-i="' + G.sel + '"]');
+      if (selTab && selTab.scrollIntoView) selTab.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+    var tabs = tabsEl.querySelectorAll(".tab");
+    for (var i = 0; i < tabs.length; i++) {
+      var t = G.timers[i], txt = fmt(shown(t));
+      var sp = tabs[i].lastChild;
+      if (sp.textContent !== txt) sp.textContent = txt;
+      tabs[i].setAttribute("aria-selected", i === G.sel ? "true" : "false");
+      tabs[i].classList.toggle("running", t.running);
+      tabs[i].classList.toggle("done", t.done && i !== G.sel);
+    }
+    $("addBtn").hidden = G.timers.length >= MAX_TIMERS;
+  }
+
+  var lastShown = "", lastColor = "";
   function render() {
-    var r = rem();
-    var shown = S.running ? Math.ceil(r - 1e-6) : Math.round(r);
-    var txt = fmt(shown);
-    if (txt !== lastShown) { timeEl.textContent = txt; lastShown = txt; document.title = (S.running ? txt + " · " : "") + "Pomodoro Dial"; }
+    var t = cur(), r = rem(t), txt = fmt(shown(t));
+    if (txt !== lastShown) { timeEl.textContent = txt; lastShown = txt; }
+    document.title = anyRunning() ? txt + " · Pomodoro Dial" : "Pomodoro Dial";
 
-    var frac = S.total > 0 ? Math.min(1, r / S.total) : 0;
+    if (t.color !== lastColor) {
+      dial.classList.add("switching");
+      root.style.setProperty("--accent", "var(--" + t.color + ")");
+      lastColor = t.color;
+      setTimeout(function () { dial.classList.remove("switching"); }, 50);
+    }
+    var frac = t.total > 0 ? Math.min(1, r / t.total) : 0;
     arc.setAttribute("stroke-dashoffset", (CIRC * (1 - frac)).toFixed(2));
-    jog.setAttribute("transform", "rotate(" + S.rot.toFixed(1) + " 100 100)");
+    jog.setAttribute("transform", "rotate(" + G.rot.toFixed(1) + " 100 100)");
+    modeLabel.textContent = labelFor(t);
 
-    root.setAttribute("data-mode", S.mode);
-    modeLabel.textContent = S.mode === "focus" ? (S.presetMin >= 50 ? "Deep focus" : "Focus") : (S.presetMin >= 15 ? "Long break" : "Break");
-
-    var paused = !S.running && !S.done && r < S.total;
+    var paused = !t.running && !t.done && r < t.total;
     dial.classList.toggle("paused", paused);
-    dial.classList.toggle("done", S.done);
+    dial.classList.toggle("done", t.done);
 
-    if (S.done) {
+    if (t.done) {
       statusEl.textContent = "Time’s up";
-      var n = nextUp();
+      var n = nextUp(t);
       goBtn.textContent = n.mode === "break" ? "Start " + n.min + "-min break" : "Start focus";
-    } else if (S.running) {
-      statusEl.textContent = S.mode === "focus" ? "Focusing" : "On break";
+    } else if (t.running) {
+      statusEl.textContent = t.mode === "focus" ? "Focusing" : "On break";
       goBtn.textContent = "Pause";
     } else if (paused) {
-      statusEl.textContent = "Paused · turn dial to scrub";
+      statusEl.textContent = "Paused · turn dial to adjust";
       goBtn.textContent = "Resume";
     } else {
       statusEl.textContent = "Ready";
@@ -490,21 +564,22 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     var btns = document.querySelectorAll(".preset");
     for (var i = 0; i < btns.length; i++) {
       var b = btns[i];
-      b.setAttribute("aria-pressed", (+b.dataset.min === S.presetMin && b.dataset.mode === S.mode) ? "true" : "false");
+      b.setAttribute("aria-pressed", (+b.dataset.min === t.presetMin && b.dataset.mode === t.mode) ? "true" : "false");
     }
-    var pips = document.querySelectorAll(".pip"), filled = S.sessions % 4;
-    if (S.sessions > 0 && filled === 0) filled = 4;
-    for (var j = 0; j < pips.length; j++) pips[j].classList.toggle("on", j < filled);
-    $("pipLabel").textContent = S.sessions + (S.sessions === 1 ? " pomodoro" : " pomodoros") + " today";
+    renderTabs();
 
-    $("soundBtn").setAttribute("aria-pressed", S.sound ? "true" : "false");
-    $("soundTxt").textContent = S.sound ? "On" : "Off";
-    $("waves").style.opacity = S.sound ? 1 : 0;
+    $("soundBtn").setAttribute("aria-pressed", G.sound ? "true" : "false");
+    $("waves").style.opacity = G.sound ? 1 : 0;
     svg.setAttribute("aria-valuetext", txt + " remaining");
   }
 
   setInterval(function () {
-    if (S.running) { if (rem() <= 0) finish(); else render(); }
+    var changed = false;
+    for (var i = 0; i < G.timers.length; i++) {
+      var t = G.timers[i];
+      if (t.running) { changed = true; if (rem(t) <= 0) finish(t); }
+    }
+    if (changed) render();
   }, 250);
 
   /* ---------- Dial gesture ---------- */
@@ -515,9 +590,10 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   }
   svg.addEventListener("pointerdown", function (e) {
     audio();
-    if (S.running) pause();
-    if (S.done) S.done = false;
-    S.remaining = Math.round(S.remaining);
+    var t = cur();
+    if (t.running) pause(t);
+    if (t.done) t.done = false;
+    t.remaining = Math.round(t.remaining);
     drag = { id: e.pointerId, last: angleOf(e), acc: 0 };
     try { svg.setPointerCapture(e.pointerId); } catch (x) {}
     dial.classList.add("scrubbing");
@@ -525,21 +601,22 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   });
   svg.addEventListener("pointermove", function (e) {
     if (!drag || e.pointerId !== drag.id) return;
+    var t = cur();
     var a = angleOf(e), d = a - drag.last;
     if (d > 180) d -= 360; else if (d < -180) d += 360;
     drag.last = a;
     // clockwise (d > 0) adds time; counter-clockwise removes time
-    var before = S.remaining;
+    var before = t.remaining;
     drag.acc += d * SEC_PER_TURN / 360;
     var steps = drag.acc > 0 ? Math.floor(drag.acc / STEP) : Math.ceil(drag.acc / STEP);
     if (steps !== 0) {
       drag.acc -= steps * STEP;
-      var after = setRemaining(before + steps * STEP);
+      var after = setRemaining(t, before + steps * STEP);
       if (after !== before) click();
       else drag.acc = 0;             // hit 00:00 or max: stop winding
     }
-    if (S.remaining !== before || steps === 0) S.rot += d;
-    jog.setAttribute("transform", "rotate(" + S.rot.toFixed(1) + " 100 100)");
+    if (t.remaining !== before || steps === 0) G.rot += d;
+    jog.setAttribute("transform", "rotate(" + G.rot.toFixed(1) + " 100 100)");
   });
   function endDrag(e) {
     if (!drag || e.pointerId !== drag.id) return;
@@ -549,39 +626,68 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   svg.addEventListener("pointercancel", endDrag);
   svg.addEventListener("wheel", function (e) {
     e.preventDefault();
-    if (S.running) pause();
+    var t = cur();
+    if (t.running) pause(t);
     var dir = e.deltaY > 0 ? -1 : 1;
-    S.rot += dir * 6;
-    var before = S.remaining;
-    if (setRemaining(Math.round(before) + dir * STEP) !== before) click();
+    G.rot += dir * 6;
+    var before = t.remaining;
+    if (setRemaining(t, Math.round(before) + dir * STEP) !== before) click();
   }, { passive: false });
   svg.addEventListener("keydown", function (e) {
-    if (e.key === "ArrowLeft" || e.key === "ArrowDown") { e.preventDefault(); if (S.running) pause(); S.rot -= 6; setRemaining(Math.round(S.remaining) - STEP); click(); }
-    if (e.key === "ArrowRight" || e.key === "ArrowUp") { e.preventDefault(); if (S.running) pause(); S.rot += 6; setRemaining(Math.round(S.remaining) + STEP); click(); }
+    var t = cur(), dir = 0;
+    if (e.key === "ArrowLeft" || e.key === "ArrowDown") dir = -1;
+    if (e.key === "ArrowRight" || e.key === "ArrowUp") dir = 1;
+    if (!dir) return;
+    e.preventDefault();
+    if (t.running) pause(t);
+    G.rot += dir * 6;
+    setRemaining(t, Math.round(t.remaining) + dir * STEP); click();
   });
 
   /* ---------- Buttons ---------- */
   goBtn.addEventListener("click", function () {
     audio();
-    if (S.done) { var n = nextUp(); loadPreset(n.min, n.mode); start(); return; }
-    if (S.running) pause(); else start();
+    var t = cur();
+    if (t.done) { var n = nextUp(t); loadPreset(t, n.min, n.mode); start(t); return; }
+    if (t.running) pause(t); else start(t);
   });
-  $("resetBtn").addEventListener("click", function () { loadPreset(S.presetMin, S.mode); });
+  $("resetBtn").addEventListener("click", function () { var t = cur(); loadPreset(t, t.presetMin, t.mode); });
   $("presets").addEventListener("click", function (e) {
     var b = e.target.closest(".preset"); if (!b) return;
-    loadPreset(+b.dataset.min, b.dataset.mode);
+    loadPreset(cur(), +b.dataset.min, b.dataset.mode);
   });
   var nudges = document.querySelectorAll(".nudge");
   for (var i = 0; i < nudges.length; i++) {
     nudges[i].addEventListener("click", function () {
       audio();
-      var r = setRemaining(Math.round(rem()) + (+this.dataset.d));
-      if (r === 0 && !S.running && !S.done) render();
+      var t = cur();
+      setRemaining(t, Math.round(rem(t)) + (+this.dataset.d));
     });
   }
+  tabsEl.addEventListener("click", function (e) {
+    var x = e.target.closest(".tab-x");
+    if (x) {
+      var k = +x.dataset.x;
+      G.timers.splice(k, 1);
+      if (G.sel >= G.timers.length) G.sel = G.timers.length - 1;
+      render(); save(); return;
+    }
+    var tab = e.target.closest(".tab");
+    if (tab) {
+      G.sel = +tab.dataset.i;
+      var t = cur(); if (t.done) { /* seeing it acknowledges it */ }
+      render(); save();
+    }
+  });
+  $("addBtn").addEventListener("click", function () {
+    if (G.timers.length >= MAX_TIMERS) return;
+    G.timers.push(newTimer(freeColor(), 25, "focus"));
+    G.sel = G.timers.length - 1;
+    render(); save();
+  });
   $("soundBtn").addEventListener("click", function () {
-    S.sound = !S.sound; store("sound", S.sound);
-    if (S.sound) click();
+    G.sound = !G.sound; store("sound", G.sound);
+    if (G.sound) click();
     render();
   });
   var fsBtn = $("fsBtn");
@@ -599,20 +705,26 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
   /* ---------- Boot ---------- */
   function boot(saved) {
-    S.sound = load("sound", true);
-    var day = new Date().toDateString();
-    if (load("day", "") !== day) { store("day", day); store("sessions", 0); }
-    S.sessions = load("sessions", 0);
-    var p = load("preset", { min: 25, mode: "focus" });
-    S.presetMin = p.min; S.mode = p.mode; S.total = S.remaining = p.min * 60;
-    if (saved && saved.S) {
-      for (var k in saved.S) S[k] = saved.S[k];
-      if (S.running) wake();
+    G.sound = load("sound", true);
+    var st = (saved && saved.G) ? saved.G : load("timers", null);
+    if (st && st.timers && st.timers.length) {
+      G.timers = st.timers.slice(0, MAX_TIMERS);
+      G.sel = Math.min(st.sel || 0, G.timers.length - 1);
+      G.focusDone = st.focusDone || 0;
+      if (typeof st.rot === "number") G.rot = st.rot;
+    } else {
+      G.timers = [newTimer("tomato", 25, "focus")];
+      G.sel = 0;
     }
-    render();
+    // Timers that ran out while the page was closed finish quietly.
+    G.timers.forEach(function (t) {
+      if (t.running && t.endAt <= Date.now()) { t.running = false; t.remaining = 0; t.done = true; }
+    });
+    if (anyRunning()) wake();
+    render(); save();
   }
-  if (window.claude && window.claude.hot) {
-    window.claude.hot.snapshot && window.claude.hot.snapshot(function () { return { S: S }; });
+  if (window.claude && window.claude.hot && window.claude.hot.snapshot) {
+    window.claude.hot.snapshot(function () { return { G: G }; });
   }
   if (window.claude && window.claude.hot && window.claude.hot.ready) window.claude.hot.ready(boot);
   else boot(window.claude && window.claude.hot ? window.claude.hot.data : null);
