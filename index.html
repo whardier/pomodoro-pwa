@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@500;700&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap">
 <style>
 *, *::before, *::after { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
 body { margin: 0; font-size: 14px; }
 [hidden] { display: none !important; }
 </style>
@@ -203,12 +204,11 @@ body {
   font-variant-numeric: tabular-nums;
   letter-spacing: -.02em;
 }
-/* Colon and seconds sit back: half-bright, half-transparent, on their own compositing layer. */
+/* Colon and seconds sit back: half-bright and half-transparent. (No layer promotion here:
+   Safari ghosts the minutes when composited spans sit inside the blinking time block.) */
 .colon, .ss {
   color: var(--fg-dim);
   opacity: .5;
-  will-change: opacity;
-  transform: translateZ(0);
 }
 /* Past 99 minutes the minutes keep full size; colon and seconds shrink to make room. */
 .time.wide .colon, .time.wide .ss { font-size: .5em; }
@@ -396,18 +396,28 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 }
 .go:active { background: var(--accent); filter: brightness(.88); }
 
-/* Portrait / phone */
+/* Portrait / phone: dial on top, controls below, everything on one screen.
+   Button rows are tightened and the dial takes whatever height is left (set by script). */
 @media (max-aspect-ratio: 1/1) {
   body { overflow-y: auto; }
   .app {
+    --gap: 8px;
     grid-template-columns: minmax(0, 1fr);
     justify-items: center;
+    gap: 10px;
     height: auto;
     min-height: 100%;
     align-content: center;
   }
-  .dial { --dial: min(86vw, 52vh); }
+  .dial { --dial: min(86vw, 42vh); }
   .controls { width: 100%; max-width: 520px; height: auto; }
+  .eta-time { font-size: 20px; }
+  .tab, .tab-x, .icon-btn { min-height: 42px; }
+  .preset { min-height: 52px; }
+  .preset b { font-size: 20px; }
+  .nudge { min-height: 46px; font-size: 18px; }
+  .reset, .go { min-height: 54px; }
+  .go { font-size: 22px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -957,6 +967,23 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     if (e.key === " " && e.target.tagName !== "BUTTON") { e.preventDefault(); goBtn.click(); }
   });
 
+  /* ---------- Portrait sizing ---------- */
+  // In portrait the controls keep their natural height and the dial gets the rest,
+  // so the page fits one screen instead of pushing the dial off the top.
+  var appEl = document.querySelector(".app"), ctlEl = document.querySelector(".controls");
+  var portraitMQ = window.matchMedia ? matchMedia("(max-aspect-ratio: 1/1)") : null;
+  function fitDial() {
+    if (!portraitMQ || !portraitMQ.matches) { dial.style.removeProperty("--dial"); return; }
+    var cs = getComputedStyle(appEl);
+    var pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + parseFloat(cs.rowGap || cs.gap || 10);
+    var avail = document.documentElement.clientHeight - ctlEl.offsetHeight - pad;
+    var d = Math.max(200, Math.min(window.innerWidth * 0.86, avail));
+    dial.style.setProperty("--dial", Math.floor(d) + "px");
+  }
+  window.addEventListener("resize", fitDial);
+  if (portraitMQ && portraitMQ.addEventListener) portraitMQ.addEventListener("change", fitDial);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitDial);
+
   /* ---------- Boot ---------- */
   function boot(saved) {
     G.sound = load("sound", true);
@@ -976,7 +1003,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
       if (t.running && t.endAt <= Date.now()) { t.endedAt = t.endAt; t.running = false; t.remaining = 0; t.done = true; }
     });
     if (anyRunning()) wake();
-    buildStars(); renderSound(); render(); save();
+    buildStars(); renderSound(); render(); save(); fitDial();
   }
   if (window.claude && window.claude.hot && window.claude.hot.snapshot) {
     window.claude.hot.snapshot(function () { return { G: G }; });
