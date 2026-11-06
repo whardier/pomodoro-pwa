@@ -68,6 +68,42 @@ body {
   padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
 
+/* ---------- Star field (breaks only) ----------
+   Three tiled layers drifting on CSS transforms: composited on the GPU, no per-frame script.
+   Hidden layers have their animations paused so they cost nothing during focus. */
+.stars {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 1.5s ease, visibility 0s linear 1.5s;
+}
+.stars.on { opacity: 1; visibility: visible; transition: opacity 1.5s ease; }
+.layer {
+  position: absolute;
+  top: 0; left: 0;
+  width: calc(100% + 512px);
+  height: calc(100% + 512px);
+  background-repeat: repeat;
+  background-size: 512px 512px;
+  will-change: transform;
+  backface-visibility: hidden;
+  animation: drift linear infinite;
+  animation-play-state: paused;
+}
+.stars.on .layer { animation-play-state: running; }
+.l1 { animation-duration: 360s; opacity: .7; }
+.l2 { animation-duration: 220s; opacity: .85; }
+.l3 { animation-duration: 140s; }
+@keyframes drift {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-512px, -512px, 0); }
+}
+.app { position: relative; z-index: 1; }
+
 /* ---------- Dial ----------
    Two stacked SVGs: the tick ring rotates as one GPU-composited layer (CSS transform),
    the face/arc above it only repaints when the remaining time changes. */
@@ -331,11 +367,18 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .layer { animation: none; }
   .arc { transition: none; }
   .dial.paused .time, .tab.done { animation: none; }
   button:active { transform: none; }
 }
 </style>
+
+<div class="stars" id="stars" aria-hidden="true">
+  <div class="layer l1" id="l1"></div>
+  <div class="layer l2" id="l2"></div>
+  <div class="layer l3" id="l3"></div>
+</div>
 
 </head>
 <body>
@@ -443,6 +486,26 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     jog.innerHTML = html;
     arc.setAttribute("stroke-dasharray", CIRC.toFixed(2));
   })();
+
+  /* ---------- Star tiles ---------- */
+  // One 512px tile per layer, drawn once on a canvas and used as a repeating background.
+  var starsEl = $("stars"), lastBreak = null;
+  function starTile(count, maxR, bright) {
+    var c = document.createElement("canvas"); c.width = c.height = 512;
+    var g = c.getContext("2d"); if (!g) return "";
+    for (var i = 0; i < count; i++) {
+      var r = 0.4 + Math.random() * maxR, a = bright * (0.35 + Math.random() * 0.65);
+      var warm = Math.random() < 0.25;
+      g.fillStyle = warm ? "rgba(255,222,190," + a.toFixed(2) + ")" : "rgba(220,235,255," + a.toFixed(2) + ")";
+      g.beginPath(); g.arc(Math.random() * 512, Math.random() * 512, r, 0, Math.PI * 2); g.fill();
+    }
+    try { return "url(" + c.toDataURL("image/png") + ")"; } catch (e) { return ""; }
+  }
+  function buildStars() {
+    $("l1").style.backgroundImage = starTile(150, 0.8, 0.85);
+    $("l2").style.backgroundImage = starTile(80, 1.2, 1.0);
+    $("l3").style.backgroundImage = starTile(30, 1.8, 1.0);
+  }
 
   /* ---------- Audio ---------- */
   var ctx = null;
@@ -645,6 +708,8 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     if (title !== lastTitle) { document.title = title; lastTitle = title; }
 
     if (t.color !== lastColor) { root.style.setProperty("--accent", "var(--" + t.color + ")"); lastColor = t.color; }
+    var onBreak = t.mode === "break" && !t.done;
+    if (onBreak !== lastBreak) { starsEl.classList.toggle("on", onBreak); lastBreak = onBreak; }
     setArc(t, r);
     setRot();
     var ml = labelFor(t);
@@ -845,7 +910,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
       if (t.running && t.endAt <= Date.now()) { t.endedAt = t.endAt; t.running = false; t.remaining = 0; t.done = true; }
     });
     if (anyRunning()) wake();
-    renderSound(); render(); save();
+    buildStars(); renderSound(); render(); save();
   }
   if (window.claude && window.claude.hot && window.claude.hot.snapshot) {
     window.claude.hot.snapshot(function () { return { G: G }; });
