@@ -203,8 +203,8 @@ body {
   font-variant-numeric: tabular-nums;
   letter-spacing: -.02em;
 }
-/* Seconds sit back: half-bright, half-transparent, on their own compositing layer. */
-.ss {
+/* Colon and seconds sit back: half-bright, half-transparent, on their own compositing layer. */
+.colon, .ss {
   color: var(--fg-dim);
   opacity: .5;
   will-change: opacity;
@@ -221,7 +221,7 @@ body {
 }
 .dial.paused .time { animation: blink 1.4s steps(2, jump-none) infinite; }
 .dial.done .time { color: var(--accent); }
-.dial.done .ss { color: var(--accent); }
+.dial.done .colon, .dial.done .ss { color: var(--accent); }
 @keyframes blink { 50% { opacity: .45; } }
 
 /* ---------- Controls ---------- */
