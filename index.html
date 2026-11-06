@@ -798,13 +798,28 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     if (G.sound) click();
     renderSound();
   });
-  var fsBtn = $("fsBtn");
-  if (document.fullscreenEnabled) {
+  var fsBtn = $("fsBtn"), docEl = document.documentElement;
+  var fsOn = docEl.requestFullscreen || docEl.webkitRequestFullscreen;
+  var fsOff = document.exitFullscreen || document.webkitExitFullscreen;
+  function inFs() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+  function goFs() { try { var p = fsOn.call(docEl); if (p && p.catch) p.catch(function () {}); } catch (e) {} }
+  if ((document.fullscreenEnabled || document.webkitFullscreenEnabled) && fsOn) {
     fsBtn.hidden = false;
     fsBtn.addEventListener("click", function () {
-      var p = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
-      if (p && p.catch) p.catch(function () {});
+      if (inFs()) { try { var p = fsOff.call(document); if (p && p.catch) p.catch(function () {}); } catch (e) {} }
+      else goFs();
     });
+    // Browsers without PWA install (Jelly, plain WebViews) open a home-screen shortcut
+    // as an ordinary tab. On a touch device that isn't already standalone, the first
+    // tap asks for full screen so the browser chrome goes away.
+    var standalone = navigator.standalone ||
+      (window.matchMedia && (matchMedia("(display-mode: standalone)").matches || matchMedia("(display-mode: fullscreen)").matches));
+    var coarse = window.matchMedia && matchMedia("(pointer: coarse)").matches;
+    if (!standalone && coarse) {
+      document.addEventListener("pointerup", function (e) {
+        if (!inFs() && e.target !== fsBtn && !fsBtn.contains(e.target)) goFs();
+      }, true);
+    }
   }
   document.addEventListener("keydown", function (e) {
     if (e.target === dial) return;
