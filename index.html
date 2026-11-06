@@ -523,22 +523,6 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + dur + 0.02);
   }
-  var clickBuf = null;
-  function click() {
-    if (!G.sound) return;
-    var c = audio(); if (!c) return;
-    if (!clickBuf) {
-      var n = Math.floor(c.sampleRate * 0.03);
-      clickBuf = c.createBuffer(1, n, c.sampleRate);
-      var d = clickBuf.getChannelData(0);
-      for (var i = 0; i < n; i++) {
-        var env = 1 - i / n;
-        d[i] = (Math.sin(2 * Math.PI * 1800 * i / c.sampleRate) > 0 ? 1 : -1) * 0.06 * env * env;
-      }
-    }
-    var src = c.createBufferSource();
-    src.buffer = clickBuf; src.connect(c.destination); src.start();
-  }
   // Each color gets its own chime pitch so you can tell timers apart by ear.
   var CHIME_BASE = { red: 523, orange: 587, yellow: 659, green: 784, blue: 880 };  // rising with timer number
   function chime(color) {
@@ -783,8 +767,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     if (steps !== 0) {
       drag.acc -= steps * STEP;
       var after = setRemaining(t, before + steps * STEP, true);
-      if (after !== before) click();
-      else drag.acc = 0;             // hit 00:00 or max: stop winding
+      if (after === before) drag.acc = 0;   // hit 00:00 or max: stop winding
     }
     if (t.remaining !== before || steps === 0) G.rot += d;
     setRot();
@@ -802,8 +785,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     if (t.running) pause(t);
     var dir = e.deltaY > 0 ? -1 : 1;
     G.rot += dir * 6;
-    var before = t.remaining;
-    if (setRemaining(t, Math.round(before) + dir * STEP) !== before) click();
+    setRemaining(t, Math.round(t.remaining) + dir * STEP);
   }, { passive: false });
   dial.addEventListener("keydown", function (e) {
     var t = cur(), dir = 0;
@@ -813,7 +795,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     e.preventDefault();
     if (t.running) pause(t);
     G.rot += dir * 6;
-    setRemaining(t, Math.round(t.remaining) + dir * STEP); click();
+    setRemaining(t, Math.round(t.remaining) + dir * STEP);
   });
 
   /* ---------- Buttons ---------- */
@@ -860,7 +842,6 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   });
   $("soundBtn").addEventListener("click", function () {
     G.sound = !G.sound; store("sound", G.sound);
-    if (G.sound) click();
     renderSound();
   });
   var fsBtn = $("fsBtn"), docEl = document.documentElement;
