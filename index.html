@@ -149,7 +149,6 @@ body {
   opacity: 0;
   transition: opacity .6s ease;
 }
-.ring-accent .bezel { fill: none; }
 .ring-accent .bezel-edge { stroke: var(--accent); stroke-width: 2.5; }
 .ring-accent .tick { stroke: var(--accent); opacity: .85; }
 .ring-accent .tick.major { stroke: var(--accent); opacity: 1; }
@@ -159,7 +158,8 @@ body {
   0%, 100% { opacity: .12; }
   50%      { opacity: 1; }
 }
-.bezel { fill: var(--surface); }
+/* The bezel is an open ring (82–99), so the page background shows through the face. */
+.bezel { fill: none; stroke: var(--surface); stroke-width: 17; }
 .bezel-edge { fill: none; stroke: var(--line); stroke-width: 1; }
 .tick { stroke: var(--muted); stroke-width: 1.2; stroke-linecap: round; opacity: .55; }
 .tick.major { stroke: var(--fg); stroke-width: 2; opacity: .8; }
@@ -172,7 +172,7 @@ body {
   stroke-linecap: round;
   transition: stroke .3s;
 }
-.face { fill: var(--bg); }
+.face { fill: none; }
 
 .readout {
   position: absolute;
@@ -430,7 +430,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 <main class="app">
   <div class="dial" id="dial" role="slider" aria-label="Jog dial: turn clockwise to add time, counter-clockwise to remove time" tabindex="0">
     <svg class="ring" viewBox="0 0 200 200" id="ring" aria-hidden="true">
-      <circle class="bezel" cx="100" cy="100" r="99"></circle>
+      <circle class="bezel" cx="100" cy="100" r="90.5"></circle>
       <circle class="bezel-edge" cx="100" cy="100" r="98.5"></circle>
       <g id="jog"></g>
     </svg>
