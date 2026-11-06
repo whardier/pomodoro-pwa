@@ -763,14 +763,17 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     drag.last = a;
     // clockwise (d > 0) adds time; counter-clockwise removes time
     var before = t.remaining;
+    // Hard stops: the ring will not wind below 00:00 or above the cap.
+    if ((before <= 0 && d < 0) || (before >= MAX && d > 0)) { drag.acc = 0; return; }
     drag.acc += d * SEC_PER_TURN / 360;
     var steps = drag.acc > 0 ? Math.floor(drag.acc / STEP + 1e-9) : Math.ceil(drag.acc / STEP - 1e-9);
     if (steps !== 0) {
       drag.acc -= steps * STEP;
-      var after = setRemaining(t, before + steps * STEP, true);
-      if (after === before) drag.acc = 0;   // hit 00:00 or max: stop winding
+      var want = before + steps * STEP;
+      var after = setRemaining(t, want, true);
+      if (after !== want) { drag.acc = 0; d = 0; }   // clamped: the ring stops here
     }
-    if (t.remaining !== before || steps === 0) G.rot += d;
+    G.rot += d;
     setRot();
   });
   function endDrag(e) {
@@ -784,9 +787,8 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     e.preventDefault();
     var t = cur();
     if (t.running) pause(t);
-    var dir = e.deltaY > 0 ? -1 : 1;
-    G.rot += dir * 6;
-    setRemaining(t, Math.round(t.remaining) + dir * STEP);
+    var dir = e.deltaY > 0 ? -1 : 1, before = Math.round(t.remaining);
+    if (setRemaining(t, before + dir * STEP) !== before) { G.rot += dir * 6; setRot(); }
   }, { passive: false });
   dial.addEventListener("keydown", function (e) {
     var t = cur(), dir = 0;
@@ -795,8 +797,8 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     if (!dir) return;
     e.preventDefault();
     if (t.running) pause(t);
-    G.rot += dir * 6;
-    setRemaining(t, Math.round(t.remaining) + dir * STEP);
+    var before = Math.round(t.remaining);
+    if (setRemaining(t, before + dir * STEP) !== before) { G.rot += dir * 6; setRot(); }
   });
 
   /* ---------- Buttons ---------- */
