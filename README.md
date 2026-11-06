@@ -13,7 +13,7 @@ A touch Pomodoro timer built for small landscape screens like the Echo Show 5 (9
 - Up to 5 timers at once, colored in a fixed order (red, orange, yellow, green, blue) with rising chime pitches; tap a tab to put it on the dial
 - Long break suggested after every 4th focus session
 - A slow GPU-composited star field drifts behind the page during breaks
-- End chime (toggleable), screen wake lock, full-screen button
+- End chime (toggleable) and a half-brightness accent background until the time is touched; screen wake lock; full-screen button
 - Timers keep counting across reloads
 - Works offline once loaded
 
