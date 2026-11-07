@@ -295,13 +295,18 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   margin: -3px;
 }
 .tabs::-webkit-scrollbar { display: none; }
+/* Three fixed timers. Idle tabs sit dim; a running or expired tab fills with its colour at
+   half brightness; the selected tab carries an outline in its colour. */
 .tab {
   --c: var(--red);
-  flex: 0 0 auto;
+  --c-dim: var(--red-dim);
+  flex: 1 1 0;
+  min-width: 0;
   min-height: 46px;
-  padding: 0 10px 0 8px;
+  padding: 0 8px;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 7px;
   font-family: var(--font-digits);
   font-weight: 700;
@@ -309,31 +314,26 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   font-variant-numeric: tabular-nums;
   color: var(--muted);
   background: var(--surface);
+  opacity: .5;
+  transition: background .3s, opacity .3s, border-color .2s;
 }
 .tab .dot {
   width: 12px; height: 12px;
   border-radius: 50%;
   border: 2px solid var(--c);
   box-sizing: border-box;
+  flex: 0 0 auto;
 }
-.tab.running .dot { background: var(--c); }
-.tab.done { color: var(--c); animation: blink 1s steps(2, jump-none) infinite; }
-.tab[aria-selected="true"] {
+.tab.running, .tab.done {
+  opacity: 1;
   color: var(--fg);
-  background: var(--btn-press);
+  background: var(--c-dim);
+}
+.tab.running .dot, .tab.done .dot { background: var(--c); }
+.tab[aria-selected="true"] {
+  opacity: 1;
   border-color: var(--c);
   box-shadow: inset 0 0 0 1px var(--c);
-}
-.tab-x {
-  flex: 0 0 auto;
-  min-height: 46px;
-  min-width: 40px;
-  padding: 0;
-  font-size: 22px;
-  line-height: 1;
-  color: var(--muted);
-  background: transparent;
-  border-color: transparent;
 }
 .icon-btn {
   flex: 0 0 auto;
@@ -415,7 +415,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   .dial { --dial: min(86vw, 42vh); }
   .controls { width: 100%; max-width: 520px; height: auto; }
   .eta-time { font-size: 20px; }
-  .tab, .tab-x, .icon-btn { min-height: 42px; }
+  .tab, .icon-btn { min-height: 42px; }
   .preset { min-height: 52px; }
   .preset b { font-size: 20px; }
   .nudge { min-height: 46px; font-size: 18px; }
@@ -427,7 +427,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   .layer { animation: none; }
   .dial.final .ring-accent { animation: none; opacity: 1; }
   .arc { transition: none; }
-  .dial.paused .time, .tab.done { animation: none; }
+  .dial.paused .time { animation: none; }
   button:active { transform: none; }
 }
 </style>
@@ -474,7 +474,6 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     </div>
     <div class="top">
       <div class="tabs" id="tabs" role="tablist" aria-label="Timers"></div>
-      <button class="icon-btn add-btn" id="addBtn" aria-label="Add timer">+</button>
       <button class="icon-btn" id="soundBtn" aria-pressed="true" aria-label="Sound">
         <svg viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4V5z"></path><path id="waves" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"></path></svg>
       </button>
@@ -512,7 +511,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   var MAX = 999 * 60 + 59;    // display tops out at 999:59
   var SEC_PER_TURN = 300;      // one full turn of the dial = 5 minutes
   var STEP = 5;                // dial moves in 5-second detents
-  var MAX_TIMERS = 5;
+  var TIMERS = 3;             // always exactly three: red, orange, yellow
   var COLORS = ["red", "orange", "yellow", "green", "blue"];
   var R = 74, CIRC = 2 * Math.PI * R;
 
@@ -520,7 +519,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   var root = document.documentElement;
   var dial = $("dial"), ring = $("ring"), ringAccent = $("ringAccent"), jog = $("jog"), arc = $("arc");
   var timeEl = $("time"), statusEl = $("status"), modeLabel = $("modeLabel");
-  var goBtn = $("goBtn"), tabsEl = $("tabs"), addBtn = $("addBtn");
+  var goBtn = $("goBtn"), tabsEl = $("tabs");
   var presetEls = document.querySelectorAll(".preset");
 
   var G = { timers: [], sel: 0, sound: true, rot: 0, focusDone: 0 };
@@ -670,22 +669,17 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
       tabSig = sig;
       var html = "";
       G.timers.forEach(function (t, i) {
-        html += '<button class="tab" role="tab" data-i="' + i + '" style="--c: var(--' + t.color + ')" aria-label="' +
+        html += '<button class="tab" role="tab" data-i="' + i + '" style="--c: var(--' + t.color + '); --c-dim: var(--' + t.color + '-dim)" aria-label="' +
           t.color + ' timer"><i class="dot"></i><span></span></button>';
-        if (i === G.sel && G.timers.length > 1)
-          html += '<button class="tab-x" data-x="' + i + '" aria-label="Remove ' + t.color + ' timer">×</button>';
       });
       tabsEl.innerHTML = html;
       tabEls = [];
       var found = tabsEl.querySelectorAll(".tab");
       for (var k = 0; k < found.length; k++) tabEls.push({ el: found[k], sp: found[k].lastChild, txt: "", sel: null, run: null, done: null });
-      var selTab = tabEls[G.sel] && tabEls[G.sel].el;
-      if (selTab && selTab.scrollIntoView) selTab.scrollIntoView({ block: "nearest", inline: "nearest" });
-      addBtn.hidden = G.timers.length >= MAX_TIMERS;
     }
     for (var i = 0; i < tabEls.length; i++) {
       var t = G.timers[i], c = tabEls[i], txt = fmt(shown(t));
-      var sel = i === G.sel, done = t.done && !sel;
+      var sel = i === G.sel, done = t.done;
       if (c.txt !== txt) { c.sp.textContent = txt; c.txt = txt; }
       if (c.sel !== sel) { c.el.setAttribute("aria-selected", sel ? "true" : "false"); c.sel = sel; }
       if (c.run !== t.running) { c.el.classList.toggle("running", t.running); c.run = t.running; }
@@ -924,26 +918,8 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     });
   }
   tabsEl.addEventListener("click", function (e) {
-    var x = e.target.closest(".tab-x");
-    if (x) {
-      var k = +x.dataset.x;
-      G.timers.splice(k, 1);
-      recolor();
-      if (G.sel >= G.timers.length) G.sel = G.timers.length - 1;
-      render(); save(); return;
-    }
     var tab = e.target.closest(".tab");
-    if (tab) {
-      G.sel = +tab.dataset.i;
-      var t = cur(); if (t.done) { /* seeing it acknowledges it */ }
-      render(); save();
-    }
-  });
-  $("addBtn").addEventListener("click", function () {
-    if (G.timers.length >= MAX_TIMERS) return;
-    G.timers.push(newTimer(COLORS[G.timers.length], 25, "focus"));
-    G.sel = G.timers.length - 1;
-    render(); save();
+    if (tab) { G.sel = +tab.dataset.i; render(); save(); }
   });
   $("soundBtn").addEventListener("click", function () {
     G.sound = !G.sound; store("sound", G.sound);
@@ -999,14 +975,14 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     G.sound = load("sound", true);
     var st = (saved && saved.G) ? saved.G : load("timers", null);
     if (st && st.timers && st.timers.length) {
-      G.timers = st.timers.slice(0, MAX_TIMERS);
-      G.sel = Math.min(st.sel || 0, G.timers.length - 1);
+      G.timers = st.timers.slice(0, TIMERS);
+      G.sel = Math.min(st.sel || 0, TIMERS - 1);
       G.focusDone = st.focusDone || 0;
       if (typeof st.rot === "number") G.rot = st.rot;
     } else {
-      G.timers = [newTimer("red", 25, "focus")];
-      G.sel = 0;
+      G.timers = []; G.sel = 0;
     }
+    while (G.timers.length < TIMERS) G.timers.push(newTimer(COLORS[G.timers.length], 25, "focus"));
     recolor();
     // Timers that ran out while the page was closed finish quietly.
     G.timers.forEach(function (t) {
