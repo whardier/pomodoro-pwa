@@ -249,17 +249,23 @@ button:active { background: var(--btn-press); transform: scale(.97); }
 button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
 /* Target end time */
-/* Clock block: current time over the end time, both in one digits column so the colons line up. */
+/* Clock block: current time over the end time. Everything is anchored to the right edge,
+   so a longer label, a 2-digit hour or a day tag never shifts the digits. */
 .eta {
   display: grid;
-  grid-template-columns: max-content max-content max-content;
+  grid-template-columns: minmax(0, 1fr) max-content max-content;
   column-gap: 10px;
   row-gap: 2px;
   align-items: baseline;
+  justify-items: end;
+  text-align: right;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
 }
+.eta-label { grid-column: 1; }
+.eta-day { grid-column: 2; }      /* "tomorrow" sits before the time, so the digits' right edge never moves */
+.eta-time { grid-column: 3; }
 .eta-label {
   font-size: 15px;
   font-weight: 600;
@@ -467,11 +473,11 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   <section class="controls" aria-label="Timer controls">
     <div class="eta" id="eta" aria-live="off">
       <span class="eta-label">Now</span>
-      <span class="eta-time now" id="nowTime">--:--:--</span>
       <span class="eta-day"></span>
+      <span class="eta-time now" id="nowTime">--:--:--</span>
       <span class="eta-label" id="etaLabel">Ends at</span>
-      <span class="eta-time" id="etaTime">--:--</span>
       <span class="eta-day" id="etaDay"></span>
+      <span class="eta-time" id="etaTime">--:--</span>
     </div>
     <div class="top">
       <div class="tabs" id="tabs" role="tablist" aria-label="Timers"></div>
