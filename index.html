@@ -82,20 +82,15 @@ body {
   padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
 
-/* ---------- Star field (breaks only) ----------
-   Three tiled layers drifting on CSS transforms: composited on the GPU, no per-frame script.
-   Hidden layers have their animations paused so they cost nothing during focus. */
+/* ---------- Star field ----------
+   Three tiled layers drifting on CSS transforms: composited on the GPU, no per-frame script. */
 .stars {
   position: fixed;
   inset: 0;
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 1.5s ease, visibility 0s linear 1.5s;
 }
-.stars.on { opacity: 1; visibility: visible; transition: opacity 1.5s ease; }
 .layer {
   position: absolute;
   top: 0; left: 0;
@@ -106,9 +101,7 @@ body {
   will-change: transform;
   backface-visibility: hidden;
   animation: drift linear infinite;
-  animation-play-state: paused;
 }
-.stars.on .layer { animation-play-state: running; }
 .l1 { animation-duration: 360s; opacity: .7; }
 .l2 { animation-duration: 220s; opacity: .85; }
 .l3 { animation-duration: 140s; }
@@ -117,51 +110,6 @@ body {
   to   { transform: translate3d(-512px, -512px, 0); }
 }
 .app { position: relative; z-index: 1; }
-
-/* ---------- Waves (focus only) ----------
-   Flat grayscale cut-outs stacked at the bottom like stage flats. Each layer sways on a CSS
-   transform (nearer layers travel further), composited on the GPU; paused while hidden. */
-.waves {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  overflow: hidden;
-  pointer-events: none;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 1.5s ease, visibility 0s linear 1.5s;
-}
-.waves.on { opacity: 1; visibility: visible; transition: opacity 1.5s ease; }
-.wave {
-  position: absolute;
-  bottom: 0;
-  left: calc(-1 * var(--amp));
-  width: calc(100% + 2 * var(--amp));
-  background-repeat: repeat-x;
-  background-position: left bottom;
-  will-change: transform;
-  backface-visibility: hidden;
-  animation: sway ease-in-out infinite alternate;
-  animation-play-state: paused;
-}
-.waves.on .wave { animation-play-state: running; }
-.w1 {
-  --amp: 28px;
-  animation-duration: 23s;
-  background-repeat: repeat;   /* the scallop field tiles in both directions */
-  /* the scallop field dissolves at its top edge and fades out as it meets the crests */
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 50%, transparent 80%);
-  mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 50%, transparent 80%);
-}
-/* crests are staggered vertically as well as in depth */
-.w2 { bottom: 64px; }
-.w3 { bottom: 0; }
-.w2 { --amp: 64px;  animation-duration: 15s; animation-direction: alternate-reverse; }
-.w3 { --amp: 100px; animation-duration: 11s; }
-@keyframes sway {
-  from { transform: translate3d(calc(-1 * var(--amp)), 0, 0); }
-  to   { transform: translate3d(var(--amp), 0, 0); }
-}
 
 /* ---------- Dial ----------
    Two stacked SVGs: the tick ring rotates as one GPU-composited layer (CSS transform),
@@ -476,7 +424,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .layer, .wave { animation: none; }
+  .layer { animation: none; }
   .dial.final .ring-accent { animation: none; opacity: 1; }
   .arc { transition: none; }
   .dial.paused .time, .tab.done { animation: none; }
@@ -488,12 +436,6 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   <div class="layer l1" id="l1"></div>
   <div class="layer l2" id="l2"></div>
   <div class="layer l3" id="l3"></div>
-</div>
-
-<div class="waves" id="waves" aria-hidden="true">
-  <div class="wave w1" id="w1"></div>
-  <div class="wave w2" id="w2"></div>
-  <div class="wave w3" id="w3"></div>
 </div>
 
 </head>
@@ -613,7 +555,6 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
   /* ---------- Star tiles ---------- */
   // One 512px tile per layer, drawn once on a canvas and used as a repeating background.
-  var starsEl = $("stars"), lastBreak = null;
   function starTile(count, maxR, bright) {
     var c = document.createElement("canvas"); c.width = c.height = 512;
     var g = c.getContext("2d"); if (!g) return "";
@@ -629,71 +570,6 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     $("l1").style.backgroundImage = starTile(150, 0.8, 0.85);
     $("l2").style.backgroundImage = starTile(80, 1.2, 1.0);
     $("l3").style.backgroundImage = starTile(30, 1.8, 1.0);
-  }
-
-  /* ---------- Wave tiles ---------- */
-  // Line work only, in the spirit of Japanese woodblock waves: a far field of seigaiha
-  // scallops, and in front two crest waves drawn as outlines with inner contour lines
-  // and curling tips. Each tile is a seamless SVG used as a repeating background.
-  var wavesEl = $("waves"), lastFocus = null;
-  function svgTile(w, h, body) {
-    var svg = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 " + w + " " + h + "' width='" + w + "' height='" + h + "'>" +
-      body + "</svg>";
-    return "url(\"data:image/svg+xml," + encodeURIComponent(svg) + "\")";
-  }
-  // Seigaiha: rows of concentric arcs, each row offset half a circle. Tile is 2R x R.
-  function seigaihaTile(R, color, sw) {
-    var W = 2 * R, H = R, d = "";
-    var centers = [[R, R / 2], [-R, R / 2], [3 * R, R / 2], [0, R], [2 * R, R]];
-    var radii = [1, 0.76, 0.52, 0.28];
-    centers.forEach(function (c) {
-      radii.forEach(function (k) {
-        var r = R * k;
-        d += "M" + (c[0] - r) + " " + c[1] + " A" + r + " " + r + " 0 0 1 " + (c[0] + r) + " " + c[1] + " ";
-      });
-    });
-    return svgTile(W, H, "<path d='" + d + "' fill='none' stroke='" + color + "' stroke-width='" + sw + "' stroke-linecap='round'/>");
-  }
-  // A crest wave: slow rise, steep drop. Returns one period starting and ending level.
-  function crest(P, mid, amp, lean) {
-    var cx = P * lean, cy = mid - amp, tx = P * (lean + 0.16), ty = mid + amp * 0.5;
-    return "M0 " + mid +
-      " C " + (cx * 0.45) + " " + mid + ", " + (cx - P * 0.1) + " " + cy + ", " + cx + " " + cy +
-      " C " + (cx + P * 0.05) + " " + cy + ", " + (tx - P * 0.03) + " " + ty + ", " + tx + " " + ty +
-      " C " + (tx + P * 0.1) + " " + ty + ", " + (P * 0.9) + " " + mid + ", " + P + " " + mid + " ";
-  }
-  // Curling tip and a few foam hooks at the crest.
-  function curls(P, mid, amp, lean) {
-    var cx = P * lean, cy = mid - amp, d = "";
-    d += "M" + cx + " " + cy + " c " + (P * 0.06) + " " + (-amp * 0.05) + ", " + (P * 0.08) + " " + (amp * 0.35) + ", " + (P * 0.02) + " " + (amp * 0.42) +
-         " c " + (-P * 0.03) + " " + (amp * 0.04) + ", " + (-P * 0.05) + " " + (-amp * 0.08) + ", " + (-P * 0.035) + " " + (-amp * 0.18) + " ";
-    for (var i = 1; i <= 3; i++) {
-      var x = cx + P * 0.04 * i, y = cy + amp * 0.18 * i;
-      d += "M" + x + " " + y + " c " + (P * 0.02) + " " + (amp * 0.02) + ", " + (P * 0.03) + " " + (amp * 0.14) + ", " + (P * 0.005) + " " + (amp * 0.17) + " ";
-    }
-    return d;
-  }
-  function crestTile(P, H, amp, lean, lines, color, sw) {
-    var mid = H * 0.36, gap = (H - mid) / (lines + 1), d = "";
-    for (var i = 0; i < lines; i++) d += crest(P, mid + i * gap, amp * (1 - 0.17 * i), lean);
-    d += curls(P, mid, amp, lean);
-    // a smaller secondary crest half a period along, behind the main one
-    d += crest(P, mid + gap * 0.6, amp * 0.45, lean + 0.5 > 1 ? lean - 0.5 : lean + 0.5);
-    return svgTile(P, H, "<path d='" + d + "' fill='none' stroke='" + color + "' stroke-width='" + sw + "' stroke-linecap='round' stroke-linejoin='round'/>");
-  }
-  function buildWaves() {
-    var layers = [
-      { id: "w1", w: 96,  h: 48,  img: seigaihaTile(48, "#393939", 1) },
-      { id: "w2", w: 560, h: 240, img: crestTile(560, 240, 64, 0.58, 4, "#3a3a3a", 1.3) },
-      { id: "w3", w: 400, h: 160, img: crestTile(400, 160, 46, 0.55, 3, "#4a4a4a", 1.6) }
-    ];
-    var heights = { w1: Math.round(window.innerHeight * 0.78), w2: 240, w3: 160 };
-    layers.forEach(function (L) {
-      var el = $(L.id);
-      el.style.backgroundImage = L.img;
-      el.style.backgroundSize = L.w + "px " + L.h + "px";
-      el.style.height = heights[L.id] + "px";
-    });
   }
 
   /* ---------- Audio ---------- */
@@ -919,10 +795,6 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
       root.style.setProperty("--accent-dim", "var(--" + t.color + "-dim)");
       lastColor = t.color;
     }
-    var onBreak = t.mode === "break" && !t.done;
-    if (onBreak !== lastBreak) { starsEl.classList.toggle("on", onBreak); lastBreak = onBreak; }
-    var onFocus = t.mode === "focus" && !t.done;
-    if (onFocus !== lastFocus) { wavesEl.classList.toggle("on", onFocus); lastFocus = onFocus; }
     setArc(t, r);
     setRingState(t, r);
     setRot();
@@ -1118,7 +990,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     var d = Math.max(200, Math.min(window.innerWidth * 0.86, avail));
     dial.style.setProperty("--dial", Math.floor(d) + "px");
   }
-  window.addEventListener("resize", function () { fitDial(); buildWaves(); });
+  window.addEventListener("resize", fitDial);
   if (portraitMQ && portraitMQ.addEventListener) portraitMQ.addEventListener("change", fitDial);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitDial);
 
@@ -1141,7 +1013,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
       if (t.running && t.endAt <= Date.now()) { t.endedAt = t.endAt; t.running = false; t.remaining = 0; t.done = true; }
     });
     if (anyRunning()) wake();
-    buildStars(); buildWaves(); renderSound(); renderNow(); render(); save(); fitDial();
+    buildStars(); renderSound(); renderNow(); render(); save(); fitDial();
   }
   if (window.claude && window.claude.hot && window.claude.hot.snapshot) {
     window.claude.hot.snapshot(function () { return { G: G }; });

@@ -12,8 +12,7 @@ A touch Pomodoro timer built for small landscape screens like the Echo Show 5 (9
 - Current time and the selected timer's local end time, aligned; while paused the end time keeps sliding later
 - Up to 5 timers at once, colored in a fixed order (red, orange, yellow, green, blue) with rising chime pitches; tap a tab to put it on the dial
 - Long break suggested after every 4th focus session
-- A slow GPU-composited star field drifts behind the page during breaks
-- Wireframe Japanese-style waves (seigaiha field plus curling crests) sway behind the page during focus sessions (CSS transforms only)
+- A slow GPU-composited star field drifts behind the page at all times
 - End chime (toggleable) and a half-brightness accent background until the time is touched; screen wake lock; full-screen button
 - Timers keep counting across reloads
 - Works offline once loaded
