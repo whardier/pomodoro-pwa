@@ -335,6 +335,21 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   border-color: var(--c);
   box-shadow: inset 0 0 0 1px var(--c);
 }
+/* Mirrors the outer ring: last quarter = bold outline in the timer's colour; last minute = it breathes. */
+.tab { position: relative; }
+.tab::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 2.5px var(--c);
+  opacity: 0;
+  pointer-events: none;
+  will-change: opacity;
+}
+.tab.warn { opacity: 1; color: var(--c); border-color: var(--c); }
+.tab.warn::after { opacity: 1; }
+.tab.final::after { animation: breathe 3.2s ease-in-out infinite; }
 .icon-btn {
   flex: 0 0 auto;
   min-height: 46px;
@@ -425,7 +440,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
   .layer { animation: none; }
-  .dial.final .ring-accent { animation: none; opacity: 1; }
+  .dial.final .ring-accent, .tab.final::after { animation: none; opacity: 1; }
   .arc { transition: none; }
   .dial.paused .time { animation: none; }
   button:active { transform: none; }
@@ -675,11 +690,14 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
       tabsEl.innerHTML = html;
       tabEls = [];
       var found = tabsEl.querySelectorAll(".tab");
-      for (var k = 0; k < found.length; k++) tabEls.push({ el: found[k], sp: found[k].lastChild, txt: "", sel: null, run: null, done: null });
+      for (var k = 0; k < found.length; k++) tabEls.push({ el: found[k], sp: found[k].lastChild, txt: "", sel: null, run: null, done: null, warn: null, fin: null });
     }
     for (var i = 0; i < tabEls.length; i++) {
       var t = G.timers[i], c = tabEls[i], txt = fmt(shown(t));
-      var sel = i === G.sel, done = t.done;
+      var sel = i === G.sel, done = t.done, r = rem(t);
+      var warn = r <= t.presetMin * 60 * 0.25, fin = warn && r <= 60 && !done;
+      if (c.warn !== warn) { c.el.classList.toggle("warn", warn); c.warn = warn; }
+      if (c.fin !== fin) { c.el.classList.toggle("final", fin); c.fin = fin; }
       if (c.txt !== txt) { c.sp.textContent = txt; c.txt = txt; }
       if (c.sel !== sel) { c.el.setAttribute("aria-selected", sel ? "true" : "false"); c.sel = sel; }
       if (c.run !== t.running) { c.el.classList.toggle("running", t.running); c.run = t.running; }
