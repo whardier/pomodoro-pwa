@@ -148,10 +148,14 @@ body {
 .w1 {
   --amp: 28px;
   animation-duration: 23s;
+  background-repeat: repeat;   /* the scallop field tiles in both directions */
   /* the scallop field dissolves at its top edge and fades out as it meets the crests */
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 30%, #000 55%, transparent 92%);
-  mask-image: linear-gradient(to bottom, transparent 0%, #000 30%, #000 55%, transparent 92%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 50%, transparent 80%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 50%, transparent 80%);
 }
+/* crests are staggered vertically as well as in depth */
+.w2 { bottom: 64px; }
+.w3 { bottom: 0; }
 .w2 { --amp: 64px;  animation-duration: 15s; animation-direction: alternate-reverse; }
 .w3 { --amp: 100px; animation-duration: 11s; }
 @keyframes sway {
@@ -679,11 +683,11 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   }
   function buildWaves() {
     var layers = [
-      { id: "w1", w: 96,  h: 48,  img: seigaihaTile(48, "#343434", 1) },
-      { id: "w2", w: 560, h: 170, img: crestTile(560, 170, 54, 0.58, 4, "#3a3a3a", 1.3) },
-      { id: "w3", w: 400, h: 120, img: crestTile(400, 120, 40, 0.55, 3, "#4a4a4a", 1.6) }
+      { id: "w1", w: 96,  h: 48,  img: seigaihaTile(48, "#393939", 1) },
+      { id: "w2", w: 560, h: 240, img: crestTile(560, 240, 64, 0.58, 4, "#3a3a3a", 1.3) },
+      { id: "w3", w: 400, h: 160, img: crestTile(400, 160, 46, 0.55, 3, "#4a4a4a", 1.6) }
     ];
-    var heights = { w1: Math.round(window.innerHeight * 0.55), w2: 170, w3: 120 };
+    var heights = { w1: Math.round(window.innerHeight * 0.78), w2: 240, w3: 160 };
     layers.forEach(function (L) {
       var el = $(L.id);
       el.style.backgroundImage = L.img;
