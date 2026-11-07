@@ -145,9 +145,9 @@ body {
   animation-play-state: paused;
 }
 .waves.on .wave { animation-play-state: running; }
-.w1 { --amp: 36px;  height: 36vh; animation-duration: 19s; }
-.w2 { --amp: 64px;  height: 27vh; animation-duration: 14s; animation-direction: alternate-reverse; }
-.w3 { --amp: 100px; height: 18vh; animation-duration: 11s; }
+.w1 { --amp: 28px;  animation-duration: 23s; opacity: .8; }
+.w2 { --amp: 64px;  animation-duration: 15s; animation-direction: alternate-reverse; }
+.w3 { --amp: 100px; animation-duration: 11s; }
 @keyframes sway {
   from { transform: translate3d(calc(-1 * var(--amp)), 0, 0); }
   to   { transform: translate3d(var(--amp), 0, 0); }
@@ -622,27 +622,67 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   }
 
   /* ---------- Wave tiles ---------- */
-  // One seamless SVG wave per layer, used as a repeating background. Grays only.
+  // Line work only, in the spirit of Japanese woodblock waves: a far field of seigaiha
+  // scallops, and in front two crest waves drawn as outlines with inner contour lines
+  // and curling tips. Each tile is a seamless SVG used as a repeating background.
   var wavesEl = $("waves"), lastFocus = null;
-  function waveTile(w, h, amp, color) {
-    var mid = h * 0.42, q = w / 4;
-    var d = "M0 " + mid + " C " + q + " " + (mid - amp) + ", " + (2 * q) + " " + (mid - amp) + ", " + (2 * q) + " " + mid +
-      " S " + (3.5 * q) + " " + (mid + amp) + ", " + w + " " + mid + " V" + h + " H0 Z";
-    var svg = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 " + w + " " + h + "' preserveAspectRatio='none'>" +
-      "<path d='" + d + "' fill='" + color + "'/></svg>";
+  function svgTile(w, h, body) {
+    var svg = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 " + w + " " + h + "' width='" + w + "' height='" + h + "'>" +
+      body + "</svg>";
     return "url(\"data:image/svg+xml," + encodeURIComponent(svg) + "\")";
+  }
+  // Seigaiha: rows of concentric arcs, each row offset half a circle. Tile is 2R x R.
+  function seigaihaTile(R, color, sw) {
+    var W = 2 * R, H = R, d = "";
+    var centers = [[R, R / 2], [-R, R / 2], [3 * R, R / 2], [0, R], [2 * R, R]];
+    var radii = [1, 0.76, 0.52, 0.28];
+    centers.forEach(function (c) {
+      radii.forEach(function (k) {
+        var r = R * k;
+        d += "M" + (c[0] - r) + " " + c[1] + " A" + r + " " + r + " 0 0 1 " + (c[0] + r) + " " + c[1] + " ";
+      });
+    });
+    return svgTile(W, H, "<path d='" + d + "' fill='none' stroke='" + color + "' stroke-width='" + sw + "' stroke-linecap='round'/>");
+  }
+  // A crest wave: slow rise, steep drop. Returns one period starting and ending level.
+  function crest(P, mid, amp, lean) {
+    var cx = P * lean, cy = mid - amp, tx = P * (lean + 0.16), ty = mid + amp * 0.5;
+    return "M0 " + mid +
+      " C " + (cx * 0.45) + " " + mid + ", " + (cx - P * 0.1) + " " + cy + ", " + cx + " " + cy +
+      " C " + (cx + P * 0.05) + " " + cy + ", " + (tx - P * 0.03) + " " + ty + ", " + tx + " " + ty +
+      " C " + (tx + P * 0.1) + " " + ty + ", " + (P * 0.9) + " " + mid + ", " + P + " " + mid + " ";
+  }
+  // Curling tip and a few foam hooks at the crest.
+  function curls(P, mid, amp, lean) {
+    var cx = P * lean, cy = mid - amp, d = "";
+    d += "M" + cx + " " + cy + " c " + (P * 0.06) + " " + (-amp * 0.05) + ", " + (P * 0.08) + " " + (amp * 0.35) + ", " + (P * 0.02) + " " + (amp * 0.42) +
+         " c " + (-P * 0.03) + " " + (amp * 0.04) + ", " + (-P * 0.05) + " " + (-amp * 0.08) + ", " + (-P * 0.035) + " " + (-amp * 0.18) + " ";
+    for (var i = 1; i <= 3; i++) {
+      var x = cx + P * 0.04 * i, y = cy + amp * 0.18 * i;
+      d += "M" + x + " " + y + " c " + (P * 0.02) + " " + (amp * 0.02) + ", " + (P * 0.03) + " " + (amp * 0.14) + ", " + (P * 0.005) + " " + (amp * 0.17) + " ";
+    }
+    return d;
+  }
+  function crestTile(P, H, amp, lean, lines, color, sw) {
+    var mid = H * 0.36, gap = (H - mid) / (lines + 1), d = "";
+    for (var i = 0; i < lines; i++) d += crest(P, mid + i * gap, amp * (1 - 0.17 * i), lean);
+    d += curls(P, mid, amp, lean);
+    // a smaller secondary crest half a period along, behind the main one
+    d += crest(P, mid + gap * 0.6, amp * 0.45, lean + 0.5 > 1 ? lean - 0.5 : lean + 0.5);
+    return svgTile(P, H, "<path d='" + d + "' fill='none' stroke='" + color + "' stroke-width='" + sw + "' stroke-linecap='round' stroke-linejoin='round'/>");
   }
   function buildWaves() {
     var layers = [
-      { id: "w1", w: 900, h: 220, amp: 34, color: "#3a3a3a", vh: 36 },
-      { id: "w2", w: 620, h: 170, amp: 40, color: "#2a2a2a", vh: 27 },
-      { id: "w3", w: 440, h: 120, amp: 36, color: "#212121", vh: 18 }
+      { id: "w1", w: 96,  h: 48,  img: seigaihaTile(48, "#3b3b3b", 1) },
+      { id: "w2", w: 560, h: 170, img: crestTile(560, 170, 54, 0.58, 4, "#4c4c4c", 1.4) },
+      { id: "w3", w: 400, h: 120, img: crestTile(400, 120, 40, 0.55, 3, "#6a6a6a", 1.8) }
     ];
+    var heights = { w1: Math.round(window.innerHeight * 0.55), w2: 170, w3: 120 };
     layers.forEach(function (L) {
-      var el = $(L.id), ph = Math.round(window.innerHeight * L.vh / 100);
-      var pw = Math.round(L.w * ph / L.h);
-      el.style.backgroundImage = waveTile(L.w, L.h, L.amp, L.color);
-      el.style.backgroundSize = pw + "px " + ph + "px";
+      var el = $(L.id);
+      el.style.backgroundImage = L.img;
+      el.style.backgroundSize = L.w + "px " + L.h + "px";
+      el.style.height = heights[L.id] + "px";
     });
   }
 
