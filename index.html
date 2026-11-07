@@ -118,6 +118,41 @@ body {
 }
 .app { position: relative; z-index: 1; }
 
+/* ---------- Waves (focus only) ----------
+   Flat grayscale cut-outs stacked at the bottom like stage flats. Each layer sways on a CSS
+   transform (nearer layers travel further), composited on the GPU; paused while hidden. */
+.waves {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 1.5s ease, visibility 0s linear 1.5s;
+}
+.waves.on { opacity: 1; visibility: visible; transition: opacity 1.5s ease; }
+.wave {
+  position: absolute;
+  bottom: 0;
+  left: calc(-1 * var(--amp));
+  width: calc(100% + 2 * var(--amp));
+  background-repeat: repeat-x;
+  background-position: left bottom;
+  will-change: transform;
+  backface-visibility: hidden;
+  animation: sway ease-in-out infinite alternate;
+  animation-play-state: paused;
+}
+.waves.on .wave { animation-play-state: running; }
+.w1 { --amp: 36px;  height: 36vh; animation-duration: 19s; }
+.w2 { --amp: 64px;  height: 27vh; animation-duration: 14s; animation-direction: alternate-reverse; }
+.w3 { --amp: 100px; height: 18vh; animation-duration: 11s; }
+@keyframes sway {
+  from { transform: translate3d(calc(-1 * var(--amp)), 0, 0); }
+  to   { transform: translate3d(var(--amp), 0, 0); }
+}
+
 /* ---------- Dial ----------
    Two stacked SVGs: the tick ring rotates as one GPU-composited layer (CSS transform),
    the face/arc above it only repaints when the remaining time changes. */
@@ -431,7 +466,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .layer { animation: none; }
+  .layer, .wave { animation: none; }
   .dial.final .ring-accent { animation: none; opacity: 1; }
   .arc { transition: none; }
   .dial.paused .time, .tab.done { animation: none; }
@@ -443,6 +478,12 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   <div class="layer l1" id="l1"></div>
   <div class="layer l2" id="l2"></div>
   <div class="layer l3" id="l3"></div>
+</div>
+
+<div class="waves" id="waves" aria-hidden="true">
+  <div class="wave w1" id="w1"></div>
+  <div class="wave w2" id="w2"></div>
+  <div class="wave w3" id="w3"></div>
 </div>
 
 </head>
@@ -578,6 +619,31 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     $("l1").style.backgroundImage = starTile(150, 0.8, 0.85);
     $("l2").style.backgroundImage = starTile(80, 1.2, 1.0);
     $("l3").style.backgroundImage = starTile(30, 1.8, 1.0);
+  }
+
+  /* ---------- Wave tiles ---------- */
+  // One seamless SVG wave per layer, used as a repeating background. Grays only.
+  var wavesEl = $("waves"), lastFocus = null;
+  function waveTile(w, h, amp, color) {
+    var mid = h * 0.42, q = w / 4;
+    var d = "M0 " + mid + " C " + q + " " + (mid - amp) + ", " + (2 * q) + " " + (mid - amp) + ", " + (2 * q) + " " + mid +
+      " S " + (3.5 * q) + " " + (mid + amp) + ", " + w + " " + mid + " V" + h + " H0 Z";
+    var svg = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 " + w + " " + h + "' preserveAspectRatio='none'>" +
+      "<path d='" + d + "' fill='" + color + "'/></svg>";
+    return "url(\"data:image/svg+xml," + encodeURIComponent(svg) + "\")";
+  }
+  function buildWaves() {
+    var layers = [
+      { id: "w1", w: 900, h: 220, amp: 34, color: "#3a3a3a", vh: 36 },
+      { id: "w2", w: 620, h: 170, amp: 40, color: "#2a2a2a", vh: 27 },
+      { id: "w3", w: 440, h: 120, amp: 36, color: "#212121", vh: 18 }
+    ];
+    layers.forEach(function (L) {
+      var el = $(L.id), ph = Math.round(window.innerHeight * L.vh / 100);
+      var pw = Math.round(L.w * ph / L.h);
+      el.style.backgroundImage = waveTile(L.w, L.h, L.amp, L.color);
+      el.style.backgroundSize = pw + "px " + ph + "px";
+    });
   }
 
   /* ---------- Audio ---------- */
@@ -805,6 +871,8 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     }
     var onBreak = t.mode === "break" && !t.done;
     if (onBreak !== lastBreak) { starsEl.classList.toggle("on", onBreak); lastBreak = onBreak; }
+    var onFocus = t.mode === "focus" && !t.done;
+    if (onFocus !== lastFocus) { wavesEl.classList.toggle("on", onFocus); lastFocus = onFocus; }
     setArc(t, r);
     setRingState(t, r);
     setRot();
@@ -1000,7 +1068,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     var d = Math.max(200, Math.min(window.innerWidth * 0.86, avail));
     dial.style.setProperty("--dial", Math.floor(d) + "px");
   }
-  window.addEventListener("resize", fitDial);
+  window.addEventListener("resize", function () { fitDial(); buildWaves(); });
   if (portraitMQ && portraitMQ.addEventListener) portraitMQ.addEventListener("change", fitDial);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitDial);
 
@@ -1023,7 +1091,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
       if (t.running && t.endAt <= Date.now()) { t.endedAt = t.endAt; t.running = false; t.remaining = 0; t.done = true; }
     });
     if (anyRunning()) wake();
-    buildStars(); renderSound(); renderNow(); render(); save(); fitDial();
+    buildStars(); buildWaves(); renderSound(); renderNow(); render(); save(); fitDial();
   }
   if (window.claude && window.claude.hot && window.claude.hot.snapshot) {
     window.claude.hot.snapshot(function () { return { G: G }; });
