@@ -33,20 +33,17 @@ body { margin: 0; font-size: 14px; }
   --fg-dim: #7b7672;   /* --fg at half brightness, for the seconds */
   --muted: #a8968b;
   --ink: #1b0f0b;
-  /* timer colors, always assigned in this order: 1 red, 2 orange, 3 yellow, 4 green, 5 blue */
-  --red: #ff4b4b;
-  --orange: #ff8c32;
-  --yellow: #ffd23f;
-  --green: #5ccf6a;
-  --blue: #4aa6ff;
-  /* each at half brightness: the page background while a finished timer waits */
-  --red-dim: #802626;
-  --orange-dim: #804619;
-  --yellow-dim: #806920;
-  --green-dim: #2e6835;
-  --blue-dim: #255380;
-  --accent: var(--red);
-  --accent-dim: var(--red-dim);
+  /* Timer colours, always in this order: 1 red, 2 orange, 3 yellow. Each comes in three tones:
+     standard (plain timer), deep (focus) and muted (break). */
+  --red: #ff4b4b;     --red-deep: #e8201f;     --red-muted: #d9908c;
+  --orange: #ff8c32;  --orange-deep: #ee6a00;  --orange-muted: #d9a985;
+  --yellow: #ffd23f;  --yellow-deep: #f2b100;  --yellow-muted: #d9c78f;
+  /* every tone at half brightness: running/expired tab fill and the time's-up page background */
+  --red-dim: #802626;     --red-deep-dim: #741010;     --red-muted-dim: #6d4846;
+  --orange-dim: #804619;  --orange-deep-dim: #773500;  --orange-muted-dim: #6d5543;
+  --yellow-dim: #806920;  --yellow-deep-dim: #795900;  --yellow-muted-dim: #6d6448;
+  --accent: var(--red-deep);
+  --accent-dim: var(--red-deep-dim);
   --font-digits: "Azeret Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   --font-ui: "Barlow Semi Condensed", "Roboto Condensed", "Arial Narrow", system-ui, sans-serif;
   --gap: clamp(6px, 1.6vh, 12px);
@@ -365,7 +362,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
 .presets {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: var(--gap);
 }
 .preset {
@@ -502,6 +499,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
       <button class="preset" data-min="50" data-mode="focus" id="p50"><b>50</b><span>Deep</span></button>
       <button class="preset" data-min="5" data-mode="break" id="p5"><b>5</b><span>Break</span></button>
       <button class="preset" data-min="15" data-mode="break" id="p15"><b>15</b><span>Long</span></button>
+      <button class="preset" data-min="30" data-mode="timer" id="p30"><b>30</b><span>Timer</span></button>
     </div>
 
     <div class="nudges">
@@ -527,7 +525,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   var SEC_PER_TURN = 300;      // one full turn of the dial = 5 minutes
   var STEP = 5;                // dial moves in 5-second detents
   var TIMERS = 3;             // always exactly three: red, orange, yellow
-  var COLORS = ["red", "orange", "yellow", "green", "blue"];
+  var COLORS = ["red", "orange", "yellow"];
   var R = 74, CIRC = 2 * Math.PI * R;
 
   var $ = function (id) { return document.getElementById(id); };
@@ -550,6 +548,8 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   function cur() { return G.timers[G.sel]; }
   // Colors follow slot order, so timer 1 is always red, timer 2 orange, and so on.
   function recolor() { G.timers.forEach(function (t, i) { t.color = COLORS[i % COLORS.length]; }); }
+  // Colour token for a timer: deep while focusing, muted on a break, standard for a plain timer.
+  function shade(t) { return t.color + (t.mode === "focus" ? "-deep" : t.mode === "break" ? "-muted" : ""); }
 
   /* ---------- Build jog ticks ---------- */
   (function buildTicks() {
@@ -603,7 +603,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + dur + 0.02);
   }
   // Each color gets its own chime pitch so you can tell timers apart by ear.
-  var CHIME_BASE = { red: 523, orange: 587, yellow: 659, green: 784, blue: 880 };  // rising with timer number
+  var CHIME_BASE = { red: 523, orange: 587, yellow: 659 };  // rising with timer number
   function chime(color) {
     if (!G.sound) return;
     var b = CHIME_BASE[color] || 659, notes = [b, b * 1.189, b * 1.498];
@@ -664,6 +664,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   }
   function nextUp(t) {
     if (t.mode === "focus") return G.focusDone > 0 && G.focusDone % 4 === 0 ? { min: 15, mode: "break" } : { min: 5, mode: "break" };
+    if (t.mode === "timer") return { min: t.presetMin, mode: "timer" };   // a plain timer just runs again
     return { min: 25, mode: "focus" };
   }
 
@@ -674,6 +675,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   }
   function shown(t) { var r = rem(t); return t.running ? Math.ceil(r - 1e-6) : Math.round(r); }
   function labelFor(t) {
+    if (t.mode === "timer") return "Timer";
     return t.mode === "focus" ? (t.presetMin >= 50 ? "Deep focus" : "Focus") : (t.presetMin >= 15 ? "Long break" : "Break");
   }
 
@@ -684,17 +686,21 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
       tabSig = sig;
       var html = "";
       G.timers.forEach(function (t, i) {
-        html += '<button class="tab" role="tab" data-i="' + i + '" style="--c: var(--' + t.color + '); --c-dim: var(--' + t.color + '-dim)" aria-label="' +
-          t.color + ' timer"><i class="dot"></i><span></span></button>';
+        html += '<button class="tab" role="tab" data-i="' + i + '" aria-label="' + t.color + ' timer"><i class="dot"></i><span></span></button>';
       });
       tabsEl.innerHTML = html;
       tabEls = [];
       var found = tabsEl.querySelectorAll(".tab");
-      for (var k = 0; k < found.length; k++) tabEls.push({ el: found[k], sp: found[k].lastChild, txt: "", sel: null, run: null, done: null, warn: null, fin: null });
+      for (var k = 0; k < found.length; k++) tabEls.push({ el: found[k], sp: found[k].lastChild, txt: "", sel: null, run: null, done: null, warn: null, fin: null, shade: "" });
     }
     for (var i = 0; i < tabEls.length; i++) {
       var t = G.timers[i], c = tabEls[i], txt = fmt(shown(t));
-      var sel = i === G.sel, done = t.done, r = rem(t);
+      var sel = i === G.sel, done = t.done, r = rem(t), sh = shade(t);
+      if (c.shade !== sh) {
+        c.el.style.setProperty("--c", "var(--" + sh + ")");
+        c.el.style.setProperty("--c-dim", "var(--" + sh + "-dim)");
+        c.shade = sh;
+      }
       var warn = r <= t.presetMin * 60 * 0.25, fin = warn && r <= 60 && !done;
       if (c.warn !== warn) { c.el.classList.toggle("warn", warn); c.warn = warn; }
       if (c.fin !== fin) { c.el.classList.toggle("final", fin); c.fin = fin; }
@@ -802,10 +808,11 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     var title = anyRunning() ? txt + " · Pomodoro Dial" : "Pomodoro Dial";
     if (title !== lastTitle) { document.title = title; lastTitle = title; }
 
-    if (t.color !== lastColor) {
-      root.style.setProperty("--accent", "var(--" + t.color + ")");
-      root.style.setProperty("--accent-dim", "var(--" + t.color + "-dim)");
-      lastColor = t.color;
+    var sh = shade(t);
+    if (sh !== lastColor) {
+      root.style.setProperty("--accent", "var(--" + sh + ")");
+      root.style.setProperty("--accent-dim", "var(--" + sh + "-dim)");
+      lastColor = sh;
     }
     setArc(t, r);
     setRingState(t, r);
@@ -821,8 +828,8 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     if (t.done) {
       st = "Time’s up";
       var n = nextUp(t);
-      go = n.mode === "break" ? "Start " + n.min + "-min break" : "Start focus";
-    } else if (t.running) { st = t.mode === "focus" ? "Focusing" : "On break"; go = "Pause"; }
+      go = n.mode === "break" ? "Start " + n.min + "-min break" : n.mode === "timer" ? "Start again" : "Start focus";
+    } else if (t.running) { st = t.mode === "focus" ? "Focusing" : t.mode === "break" ? "On break" : "Running"; go = "Pause"; }
     else if (paused) { st = "Paused · turn dial to adjust"; go = "Resume"; }
     else { st = "Ready"; go = "Start"; }
     if (st !== lastStatus) { statusEl.textContent = st; lastStatus = st; }

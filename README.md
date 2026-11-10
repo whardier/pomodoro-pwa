@@ -5,7 +5,8 @@ A touch Pomodoro timer built for small landscape screens like the Echo Show 5 (9
 **Live:** https://whardier.github.io/pomodoro-pwa/
 
 ## Features
-- Presets: 25 Focus, 50 Deep, 5 Break, 15 Long
+- Presets: 25 Focus, 50 Deep, 5 Break, 15 Long, plus a plain 30-minute Timer
+- Each timer's colour shifts with its mode: deeper for focus, muted for breaks, standard for a plain timer
 - Jog dial: touch to pause, turn clockwise to add time, counter-clockwise to remove it (5-second detents, 5 minutes per turn)
 - Quick nudges: ±1, ±3, ±5 minutes, running or paused
 - Outer ring lights up in the accent colour for the last quarter of the preset and breathes during the final minute
