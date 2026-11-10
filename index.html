@@ -381,7 +381,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
 .nudges {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: var(--gap);
 }
 .nudge {
@@ -389,8 +389,8 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   font-weight: 700;
   font-size: clamp(17px, 4.6vh, 22px);
   min-height: clamp(48px, 12vh, 58px);
+  padding: 0 2px;
 }
-.nudge small { font-family: var(--font-ui); font-weight: 600; font-size: .7em; color: var(--muted); margin-left: 2px; }
 .nudge.minus { background: var(--surface); }
 
 .actions {
@@ -503,12 +503,16 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     </div>
 
     <div class="nudges">
-      <button class="nudge minus" data-d="-60" id="m1">−1<small>min</small></button>
-      <button class="nudge minus" data-d="-180" id="m3">−3<small>min</small></button>
-      <button class="nudge minus" data-d="-300" id="m5">−5<small>min</small></button>
-      <button class="nudge" data-d="60" id="a1">+1<small>min</small></button>
-      <button class="nudge" data-d="180" id="a3">+3<small>min</small></button>
-      <button class="nudge" data-d="300" id="a5">+5<small>min</small></button>
+      <button class="nudge minus" data-d="-60" id="m1" aria-label="Minus 1 minute">−1</button>
+      <button class="nudge minus" data-d="-180" id="m3" aria-label="Minus 3 minutes">−3</button>
+      <button class="nudge minus" data-d="-300" id="m5" aria-label="Minus 5 minutes">−5</button>
+      <button class="nudge minus" data-d="-600" id="m10" aria-label="Minus 10 minutes">−10</button>
+      <button class="nudge minus" data-d="-900" id="m15" aria-label="Minus 15 minutes">−15</button>
+      <button class="nudge" data-d="60" id="a1" aria-label="Plus 1 minute">+1</button>
+      <button class="nudge" data-d="180" id="a3" aria-label="Plus 3 minutes">+3</button>
+      <button class="nudge" data-d="300" id="a5" aria-label="Plus 5 minutes">+5</button>
+      <button class="nudge" data-d="600" id="a10" aria-label="Plus 10 minutes">+10</button>
+      <button class="nudge" data-d="900" id="a15" aria-label="Plus 15 minutes">+15</button>
     </div>
 
     <div class="actions">
