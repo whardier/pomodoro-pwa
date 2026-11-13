@@ -354,6 +354,10 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   pointer-events: none;
   will-change: opacity;
 }
+/* Tab time follows the dial: minutes lead; colon and seconds are smaller and set back. */
+.t-time { display: inline-flex; align-items: baseline; }
+.t-sub { font-size: .78em; opacity: .5; }
+.t-sub:not(.t-ss) { margin: 0 .04em; }
 .tab.warn { opacity: 1; color: var(--c); border-color: var(--c); }
 .tab.warn::after { opacity: 1; }
 .tab.final::after { animation: breathe 3.2s ease-in-out infinite; }
@@ -699,12 +703,12 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
       tabSig = sig;
       var html = "";
       G.timers.forEach(function (t, i) {
-        html += '<button class="tab" role="tab" data-i="' + i + '" aria-label="' + t.color + ' timer"><i class="dot"></i><span></span></button>';
+        html += '<button class="tab" role="tab" data-i="' + i + '" aria-label="' + t.color + ' timer"><i class="dot"></i><span class="t-time"><span class="t-mm"></span><span class="t-sub">:</span><span class="t-sub t-ss"></span></span></button>';
       });
       tabsEl.innerHTML = html;
       tabEls = [];
       var found = tabsEl.querySelectorAll(".tab");
-      for (var k = 0; k < found.length; k++) tabEls.push({ el: found[k], sp: found[k].lastChild, txt: "", sel: null, run: null, done: null, warn: null, fin: null, color: "", mode: "" });
+      for (var k = 0; k < found.length; k++) tabEls.push({ el: found[k], mm: found[k].querySelector(".t-mm"), ss: found[k].querySelector(".t-ss"), txt: "", sel: null, run: null, done: null, warn: null, fin: null, color: "", mode: "" });
     }
     for (var i = 0; i < tabEls.length; i++) {
       var t = G.timers[i], c = tabEls[i], txt = fmt(shown(t));
@@ -718,7 +722,10 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
       var warn = r <= t.presetMin * 60 * 0.25, fin = warn && r <= 60 && !done;
       if (c.warn !== warn) { c.el.classList.toggle("warn", warn); c.warn = warn; }
       if (c.fin !== fin) { c.el.classList.toggle("final", fin); c.fin = fin; }
-      if (c.txt !== txt) { c.sp.textContent = txt; c.txt = txt; }
+      if (c.txt !== txt) {
+        var cut = txt.indexOf(":");
+        c.mm.textContent = txt.slice(0, cut); c.ss.textContent = txt.slice(cut + 1); c.txt = txt;
+      }
       if (c.sel !== sel) { c.el.setAttribute("aria-selected", sel ? "true" : "false"); c.sel = sel; }
       if (c.run !== t.running) { c.el.classList.toggle("running", t.running); c.run = t.running; }
       if (c.done !== done) { c.el.classList.toggle("done", done); c.done = done; }
