@@ -86,14 +86,58 @@ body {
   padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
 
-/* ---------- Star field ----------
-   Three tiled layers drifting on CSS transforms: composited on the GPU, no per-frame script. */
-.stars {
+/* ---------- Star fields ----------
+   Two backdrops, both moved only by CSS transform/opacity so they stay on the GPU with no
+   per-frame script. Focus and plain timers get the drifting field; breaks get the approach
+   field. The one that is hidden has its animations paused. */
+.stars, .warp {
   position: fixed;
   inset: 0;
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
+  transition: opacity 1.5s ease, visibility 0s linear 0s;
+}
+.warp, :root[data-mode="break"] .stars {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 1.5s ease, visibility 0s linear 1.5s;
+}
+:root[data-mode="break"] .warp {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 1.5s ease, visibility 0s linear 0s;
+}
+:root[data-mode="break"] .layer { animation-play-state: paused; }
+
+/* Approach field: four star layers each swell outward from the centre, fading in as they
+   start and out as they pass. They run a quarter-cycle apart, so the flight never ends.
+   The scale steps follow 1/distance, so stars pick up speed as they near, as they would. */
+.wl {
+  position: absolute;
+  inset: 0;
+  background-repeat: repeat;
+  background-position: center;
+  background-size: 512px 512px;
+  transform-origin: 50% 50%;
+  opacity: 0;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  animation: approach 48s linear infinite;
+  animation-play-state: paused;
+}
+:root[data-mode="break"] .wl { animation-play-state: running; }
+.wl2 { animation-delay: -12s; }
+.wl3 { animation-delay: -24s; }
+.wl4 { animation-delay: -36s; }
+@keyframes approach {
+  0%   { transform: scale(1);    opacity: 0; }
+  14%  { opacity: 1; }
+  25%  { transform: scale(1.18); }
+  50%  { transform: scale(1.44); }
+  75%  { transform: scale(1.86); }
+  80%  { opacity: 1; }
+  100% { transform: scale(2.6);  opacity: 0; }
 }
 .layer {
   position: absolute;
@@ -444,6 +488,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
   .layer { animation: none; }
+  .wl { animation: none; opacity: .8; }
   .dial.final .ring-accent, .tab.final::after { animation: none; opacity: 1; }
   .arc { transition: none; }
   .dial.paused .time { animation: none; }
@@ -455,6 +500,12 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   <div class="layer l1" id="l1"></div>
   <div class="layer l2" id="l2"></div>
   <div class="layer l3" id="l3"></div>
+</div>
+<div class="warp" id="warp" aria-hidden="true">
+  <div class="wl wl1" id="wl1"></div>
+  <div class="wl wl2" id="wl2"></div>
+  <div class="wl wl3" id="wl3"></div>
+  <div class="wl wl4" id="wl4"></div>
 </div>
 
 </head>
@@ -593,6 +644,8 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     $("l1").style.backgroundImage = starTile(150, 0.8, 0.85);
     $("l2").style.backgroundImage = starTile(80, 1.2, 1.0);
     $("l3").style.backgroundImage = starTile(30, 1.8, 1.0);
+    // approach field: a different random tile per layer so the loop never visibly repeats
+    for (var i = 1; i <= 4; i++) $("wl" + i).style.backgroundImage = starTile(70, 1.1, 1.0);
   }
 
   /* ---------- Audio ---------- */
