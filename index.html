@@ -33,18 +33,18 @@ body { margin: 0; font-size: 14px; }
   --fg-dim: #7b7672;   /* --fg at half brightness, for the seconds */
   --muted: #a8968b;
   --ink: #1b0f0b;
-  /* Timer colours, always in this order: 1 red, 2 orange, 3 yellow.
+  /* Timer colours, always in this order: 1 blue, 2 red, 3 green.
      Hex for solid use, r,g,b for fills that carry the mode's transparency. */
-  --red: #ff4b4b;     --red-rgb: 255, 75, 75;
-  --orange: #ff8c32;  --orange-rgb: 255, 140, 50;
-  --yellow: #ffd23f;  --yellow-rgb: 255, 210, 63;
+  --blue: #4aa6ff;   --blue-rgb: 74, 166, 255;
+  --red: #ff4b4b;    --red-rgb: 255, 75, 75;
+  --green: #5ccf6a;  --green-rgb: 92, 207, 106;
   /* each at half brightness: running/expired tab fill and the time's-up page background */
-  --red-dim: #802626;     --red-dim-rgb: 128, 38, 38;
-  --orange-dim: #804619;  --orange-dim-rgb: 128, 70, 25;
-  --yellow-dim: #806920;  --yellow-dim-rgb: 128, 105, 32;
-  --accent: var(--red);
-  --accent-rgb: var(--red-rgb);
-  --accent-dim: var(--red-dim);
+  --blue-dim: #255380;   --blue-dim-rgb: 37, 83, 128;
+  --red-dim: #802626;    --red-dim-rgb: 128, 38, 38;
+  --green-dim: #2e6835;  --green-dim-rgb: 46, 104, 53;
+  --accent: var(--blue);
+  --accent-rgb: var(--blue-rgb);
+  --accent-dim: var(--blue-dim);
   /* Mode strength. Focus is solid; a plain timer is a step more transparent; a break a step
      more again. Filled buttons step down less than the dial so their labels stay readable. */
   --mode-alpha: 1;
@@ -302,8 +302,8 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 /* Three fixed timers. Idle tabs sit dim; a running or expired tab fills with its colour at
    half brightness; the selected tab carries an outline in its colour. */
 .tab {
-  --c: var(--red);
-  --c-dim-rgb: var(--red-dim-rgb);
+  --c: var(--blue);
+  --c-dim-rgb: var(--blue-dim-rgb);
   --tab-alpha: 1;
   flex: 1 1 0;
   min-width: 0;
@@ -535,8 +535,8 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   var MAX = 999 * 60 + 59;    // display tops out at 999:59
   var SEC_PER_TURN = 300;      // one full turn of the dial = 5 minutes
   var STEP = 5;                // dial moves in 5-second detents
-  var TIMERS = 3;             // always exactly three: red, orange, yellow
-  var COLORS = ["red", "orange", "yellow"];
+  var TIMERS = 3;             // always exactly three: blue, red, green
+  var COLORS = ["blue", "red", "green"];
   var R = 74, CIRC = 2 * Math.PI * R;
 
   var $ = function (id) { return document.getElementById(id); };
@@ -557,7 +557,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
              remaining: (min || 25) * 60, running: false, endAt: 0, done: false };
   }
   function cur() { return G.timers[G.sel]; }
-  // Colors follow slot order, so timer 1 is always red, timer 2 orange, and so on.
+  // Colors follow slot order, so timer 1 is always blue, timer 2 red, timer 3 green.
   function recolor() { G.timers.forEach(function (t, i) { t.color = COLORS[i % COLORS.length]; }); }
 
   /* ---------- Build jog ticks ---------- */
@@ -612,7 +612,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + dur + 0.02);
   }
   // Each color gets its own chime pitch so you can tell timers apart by ear.
-  var CHIME_BASE = { red: 523, orange: 587, yellow: 659 };  // rising with timer number
+  var CHIME_BASE = { blue: 523, red: 587, green: 659 };  // rising with timer number
   function chime(color) {
     if (!G.sound) return;
     var b = CHIME_BASE[color] || 659, notes = [b, b * 1.189, b * 1.498];
