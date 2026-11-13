@@ -400,6 +400,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   font-size: clamp(17px, 4.6vh, 22px);
   min-height: clamp(48px, 12vh, 58px);
   padding: 0 2px;
+  -webkit-touch-callout: none;   /* holding repeats; no long-press menu */
 }
 .nudge.minus { background: var(--surface); }
 
@@ -950,14 +951,66 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     var b = e.target.closest(".preset"); if (!b) return;
     loadPreset(cur(), +b.dataset.min, b.dataset.mode);
   });
+  /* ---------- +/- buttons: tap for one step, hold to repeat ----------
+     A tap acts on release, exactly as before. Holding for HOLD_DELAY starts a steady repeat
+     (no acceleration); the repeat stops on release, when the finger slides off the button,
+     at 00:00 or the cap, or if another timer takes over the dial. */
+  var HOLD_DELAY = 450, HOLD_EVERY = 160;
+  var hold = null, swallowClick = false;
+  function nudge(t, delta, light) {
+    var before = Math.round(rem(t));
+    var after = setRemaining(t, before + delta, light);
+    if (light) render();          // full refresh, but no disk write per repeat
+    return after !== before;
+  }
+  function stopHold() {
+    if (!hold) return;
+    clearTimeout(hold.timer); clearInterval(hold.timer);
+    var repeated = hold.repeated;
+    hold = null;
+    if (repeated) {
+      save();
+      swallowClick = true;                                   // the release must not add one more step
+      setTimeout(function () { swallowClick = false; }, 400);
+    }
+  }
+  function holdStep() {
+    if (!hold) return;
+    if (cur() !== hold.t || !nudge(hold.t, hold.delta, true)) { hold.repeated = true; stopHold(); return; }
+    hold.repeated = true;
+  }
   var nudges = document.querySelectorAll(".nudge");
   for (var i = 0; i < nudges.length; i++) {
-    nudges[i].addEventListener("click", function () {
-      audio();
-      var t = cur();
-      setRemaining(t, Math.round(rem(t)) + (+this.dataset.d));
-    });
+    (function (btn) {
+      var delta = +btn.dataset.d;
+      btn.addEventListener("pointerdown", function (e) {
+        if (e.button) return;                                // primary button / touch / pen only
+        stopHold(); swallowClick = false; audio();
+        hold = { id: e.pointerId, t: cur(), delta: delta, repeated: false, box: btn.getBoundingClientRect() };
+        hold.timer = setTimeout(function () {
+          if (!hold) return;
+          holdStep();
+          if (hold) hold.timer = setInterval(holdStep, HOLD_EVERY);
+        }, HOLD_DELAY);
+      });
+      btn.addEventListener("pointermove", function (e) {
+        if (!hold || e.pointerId !== hold.id) return;
+        var b = hold.box;
+        if (e.clientX < b.left || e.clientX > b.right || e.clientY < b.top || e.clientY > b.bottom) stopHold();
+      });
+      btn.addEventListener("pointerup", stopHold);
+      btn.addEventListener("pointercancel", stopHold);
+      btn.addEventListener("pointerleave", stopHold);
+      btn.addEventListener("contextmenu", function (e) { e.preventDefault(); });   // no long-press menu
+      btn.addEventListener("click", function () {
+        if (swallowClick) { swallowClick = false; return; }
+        audio();
+        nudge(cur(), delta, false);
+      });
+    })(nudges[i]);
   }
+  window.addEventListener("blur", stopHold);
+  document.addEventListener("visibilitychange", stopHold);
   tabsEl.addEventListener("click", function (e) {
     var tab = e.target.closest(".tab");
     if (tab) { G.sel = +tab.dataset.i; render(); save(); }
