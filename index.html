@@ -322,13 +322,6 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   opacity: .5;
   transition: background .3s, opacity .3s, border-color .2s;
 }
-.tab .dot {
-  width: 12px; height: 12px;
-  border-radius: 50%;
-  border: 2px solid var(--c);
-  box-sizing: border-box;
-  flex: 0 0 auto;
-}
 .tab.running, .tab.done {
   opacity: 1;
   color: var(--fg);
@@ -336,7 +329,6 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 }
 .tab[data-mode="timer"] { --tab-alpha: .8; }
 .tab[data-mode="break"] { --tab-alpha: .6; }
-.tab.running .dot, .tab.done .dot { background: var(--c); }
 .tab[aria-selected="true"] {
   opacity: 1;
   border-color: var(--c);
@@ -703,7 +695,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
       tabSig = sig;
       var html = "";
       G.timers.forEach(function (t, i) {
-        html += '<button class="tab" role="tab" data-i="' + i + '" aria-label="' + t.color + ' timer"><i class="dot"></i><span class="t-time"><span class="t-mm"></span><span class="t-sub">:</span><span class="t-sub t-ss"></span></span></button>';
+        html += '<button class="tab" role="tab" data-i="' + i + '" aria-label="' + t.color + ' timer"><span class="t-time"><span class="t-mm"></span><span class="t-sub">:</span><span class="t-sub t-ss"></span></span></button>';
       });
       tabsEl.innerHTML = html;
       tabEls = [];

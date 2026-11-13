@@ -1,5 +1,5 @@
 // Offline cache for Pomodoro Dial. Bump VERSION when files change.
-const VERSION = "pomodoro-dial-v32";
+const VERSION = "pomodoro-dial-v33";
 const CORE = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/maskable-512.png"];
 
 self.addEventListener("install", (e) => {
