@@ -33,23 +33,30 @@ body { margin: 0; font-size: 14px; }
   --fg-dim: #7b7672;   /* --fg at half brightness, for the seconds */
   --muted: #a8968b;
   --ink: #1b0f0b;
-  /* Timer colours, always in this order: 1 red, 2 orange, 3 yellow. Each comes in three tones:
-     standard (plain timer), deep (focus) and muted (break). */
-  --red: #ff4b4b;     --red-deep: #e8201f;     --red-muted: #d9908c;
-  --orange: #ff8c32;  --orange-deep: #ee6a00;  --orange-muted: #d9a985;
-  --yellow: #ffd23f;  --yellow-deep: #f2b100;  --yellow-muted: #d9c78f;
-  /* every tone at half brightness: running/expired tab fill and the time's-up page background */
-  --red-dim: #802626;     --red-deep-dim: #741010;     --red-muted-dim: #6d4846;
-  --orange-dim: #804619;  --orange-deep-dim: #773500;  --orange-muted-dim: #6d5543;
-  --yellow-dim: #806920;  --yellow-deep-dim: #795900;  --yellow-muted-dim: #6d6448;
-  --accent: var(--red-deep);
-  --accent-dim: var(--red-deep-dim);
+  /* Timer colours, always in this order: 1 red, 2 orange, 3 yellow.
+     Hex for solid use, r,g,b for fills that carry the mode's transparency. */
+  --red: #ff4b4b;     --red-rgb: 255, 75, 75;
+  --orange: #ff8c32;  --orange-rgb: 255, 140, 50;
+  --yellow: #ffd23f;  --yellow-rgb: 255, 210, 63;
+  /* each at half brightness: running/expired tab fill and the time's-up page background */
+  --red-dim: #802626;     --red-dim-rgb: 128, 38, 38;
+  --orange-dim: #804619;  --orange-dim-rgb: 128, 70, 25;
+  --yellow-dim: #806920;  --yellow-dim-rgb: 128, 105, 32;
+  --accent: var(--red);
+  --accent-rgb: var(--red-rgb);
+  --accent-dim: var(--red-dim);
+  /* Mode strength. Focus is solid; a plain timer is a step more transparent; a break a step
+     more again. Filled buttons step down less than the dial so their labels stay readable. */
+  --mode-alpha: 1;
+  --mode-alpha-solid: 1;
   --font-digits: "Azeret Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   --font-ui: "Barlow Semi Condensed", "Roboto Condensed", "Arial Narrow", system-ui, sans-serif;
   --gap: clamp(6px, 1.6vh, 12px);
   --dial: min(calc(100vh - 28px), 47vw);
   color-scheme: dark;
 }
+:root[data-mode="timer"] { --mode-alpha: .7;  --mode-alpha-solid: .85; }
+:root[data-mode="break"] { --mode-alpha: .45; --mode-alpha-solid: .7; }
 
 html, body { height: 100%; }
 body {
@@ -140,9 +147,9 @@ body {
   opacity: 0;
   transition: opacity .6s ease;
 }
-.ring-accent .bezel-edge { stroke: var(--accent); stroke-width: 2.5; }
-.ring-accent .tick { stroke: var(--accent); opacity: .85; }
-.ring-accent .tick.major { stroke: var(--accent); opacity: 1; }
+.ring-accent .bezel-edge { stroke: rgba(var(--accent-rgb), var(--mode-alpha)); stroke-width: 2.5; }
+.ring-accent .tick { stroke: rgba(var(--accent-rgb), var(--mode-alpha)); opacity: .85; }
+.ring-accent .tick.major { stroke: rgba(var(--accent-rgb), var(--mode-alpha)); opacity: 1; }
 .dial.warn .ring-accent { opacity: 1; }
 .dial.final .ring-accent { animation: breathe 3.2s ease-in-out infinite; }
 @keyframes breathe {
@@ -154,11 +161,11 @@ body {
 .bezel-edge { fill: none; stroke: var(--line); stroke-width: 1; }
 .tick { stroke: var(--muted); stroke-width: 1.2; stroke-linecap: round; opacity: .55; }
 .tick.major { stroke: var(--fg); stroke-width: 2; opacity: .8; }
-.grip { fill: var(--accent); transition: fill .3s; }
+.grip { fill: rgba(var(--accent-rgb), var(--mode-alpha)); transition: fill .3s; }
 .track { fill: none; stroke: var(--btn); stroke-width: 7; }
 .arc {
   fill: none;
-  stroke: var(--accent);
+  stroke: rgba(var(--accent-rgb), var(--mode-alpha));
   stroke-width: 7;
   stroke-linecap: round;
   transition: stroke .3s;
@@ -296,7 +303,8 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
    half brightness; the selected tab carries an outline in its colour. */
 .tab {
   --c: var(--red);
-  --c-dim: var(--red-dim);
+  --c-dim-rgb: var(--red-dim-rgb);
+  --tab-alpha: 1;
   flex: 1 1 0;
   min-width: 0;
   min-height: 46px;
@@ -324,8 +332,10 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .tab.running, .tab.done {
   opacity: 1;
   color: var(--fg);
-  background: var(--c-dim);
+  background: rgba(var(--c-dim-rgb), var(--tab-alpha));
 }
+.tab[data-mode="timer"] { --tab-alpha: .8; }
+.tab[data-mode="break"] { --tab-alpha: .6; }
 .tab.running .dot, .tab.done .dot { background: var(--c); }
 .tab[aria-selected="true"] {
   opacity: 1;
@@ -400,8 +410,8 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 }
 .reset { font-size: 19px; font-weight: 600; min-height: clamp(54px, 15vh, 72px); }
 .go {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: rgba(var(--accent-rgb), var(--mode-alpha-solid));
+  border-color: transparent;
   color: var(--ink);
   font-size: clamp(20px, 5.6vh, 28px);
   font-weight: 700;
@@ -409,7 +419,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   min-height: clamp(54px, 15vh, 72px);
   transition: background .3s, border-color .3s, transform .08s;
 }
-.go:active { background: var(--accent); filter: brightness(.88); }
+.go:active { background: rgba(var(--accent-rgb), var(--mode-alpha-solid)); filter: brightness(.88); }
 
 /* Portrait / phone: dial on top, controls below, everything on one screen.
    Button rows are tightened and the dial takes whatever height is left (set by script). */
@@ -495,11 +505,11 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     </div>
 
     <div class="presets" id="presets">
+      <button class="preset" data-min="30" data-mode="timer" id="p30"><b>30</b><span>Timer</span></button>
       <button class="preset" data-min="25" data-mode="focus" id="p25"><b>25</b><span>Focus</span></button>
       <button class="preset" data-min="50" data-mode="focus" id="p50"><b>50</b><span>Deep</span></button>
       <button class="preset" data-min="5" data-mode="break" id="p5"><b>5</b><span>Break</span></button>
       <button class="preset" data-min="15" data-mode="break" id="p15"><b>15</b><span>Long</span></button>
-      <button class="preset" data-min="30" data-mode="timer" id="p30"><b>30</b><span>Timer</span></button>
     </div>
 
     <div class="nudges">
@@ -552,8 +562,6 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   function cur() { return G.timers[G.sel]; }
   // Colors follow slot order, so timer 1 is always red, timer 2 orange, and so on.
   function recolor() { G.timers.forEach(function (t, i) { t.color = COLORS[i % COLORS.length]; }); }
-  // Colour token for a timer: deep while focusing, muted on a break, standard for a plain timer.
-  function shade(t) { return t.color + (t.mode === "focus" ? "-deep" : t.mode === "break" ? "-muted" : ""); }
 
   /* ---------- Build jog ticks ---------- */
   (function buildTicks() {
@@ -695,16 +703,17 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
       tabsEl.innerHTML = html;
       tabEls = [];
       var found = tabsEl.querySelectorAll(".tab");
-      for (var k = 0; k < found.length; k++) tabEls.push({ el: found[k], sp: found[k].lastChild, txt: "", sel: null, run: null, done: null, warn: null, fin: null, shade: "" });
+      for (var k = 0; k < found.length; k++) tabEls.push({ el: found[k], sp: found[k].lastChild, txt: "", sel: null, run: null, done: null, warn: null, fin: null, color: "", mode: "" });
     }
     for (var i = 0; i < tabEls.length; i++) {
       var t = G.timers[i], c = tabEls[i], txt = fmt(shown(t));
-      var sel = i === G.sel, done = t.done, r = rem(t), sh = shade(t);
-      if (c.shade !== sh) {
-        c.el.style.setProperty("--c", "var(--" + sh + ")");
-        c.el.style.setProperty("--c-dim", "var(--" + sh + "-dim)");
-        c.shade = sh;
+      var sel = i === G.sel, done = t.done, r = rem(t);
+      if (c.color !== t.color) {
+        c.el.style.setProperty("--c", "var(--" + t.color + ")");
+        c.el.style.setProperty("--c-dim-rgb", "var(--" + t.color + "-dim-rgb)");
+        c.color = t.color;
       }
+      if (c.mode !== t.mode) { c.el.setAttribute("data-mode", t.mode); c.mode = t.mode; }   // sets the fill's transparency
       var warn = r <= t.presetMin * 60 * 0.25, fin = warn && r <= 60 && !done;
       if (c.warn !== warn) { c.el.classList.toggle("warn", warn); c.warn = warn; }
       if (c.fin !== fin) { c.el.classList.toggle("final", fin); c.fin = fin; }
@@ -806,18 +815,21 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     renderEta(t, r, !t.running && !t.done && r < t.total);
   }
 
+  var lastModeAttr = "";
   var lastColor = "", lastTitle = "", lastMode = "", lastStatus = "", lastGo = "", lastPaused = null;
   function render() {
     var t = cur(), r = rem(t), txt = setDigits(shown(t));
     var title = anyRunning() ? txt + " · Pomodoro Dial" : "Pomodoro Dial";
     if (title !== lastTitle) { document.title = title; lastTitle = title; }
 
-    var sh = shade(t);
-    if (sh !== lastColor) {
-      root.style.setProperty("--accent", "var(--" + sh + ")");
-      root.style.setProperty("--accent-dim", "var(--" + sh + "-dim)");
-      lastColor = sh;
+    if (t.color !== lastColor) {
+      root.style.setProperty("--accent", "var(--" + t.color + ")");
+      root.style.setProperty("--accent-rgb", "var(--" + t.color + "-rgb)");
+      root.style.setProperty("--accent-dim", "var(--" + t.color + "-dim)");
+      lastColor = t.color;
     }
+    // focus = solid, timer = a step more transparent, break = a step more again (see :root[data-mode])
+    if (t.mode !== lastModeAttr) { root.setAttribute("data-mode", t.mode); lastModeAttr = t.mode; }
     setArc(t, r);
     setRingState(t, r);
     setRot();
